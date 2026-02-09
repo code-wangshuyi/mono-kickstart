@@ -254,7 +254,7 @@ class ConfigManager:
         # 验证工具名称是否有效
         valid_tools = {
             "nvm", "node", "conda", "bun", "uv",
-            "claude-code", "codex", "spec-kit", "bmad-method"
+            "claude-code", "codex", "npx", "spec-kit", "bmad-method"
         }
         
         for tool_name in config.tools.keys():

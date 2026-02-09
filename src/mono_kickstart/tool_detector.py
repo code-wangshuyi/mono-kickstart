@@ -249,6 +249,25 @@ class ToolDetector:
             path=path
         )
     
+    def detect_npx(self) -> ToolStatus:
+        """检测 npx
+
+        Returns:
+            ToolStatus: npx 的状态信息
+        """
+        if not self.is_command_available("npx"):
+            return ToolStatus(name="npx", installed=False)
+
+        version = self.get_command_version("npx", "--version")
+        path = shutil.which("npx")
+
+        return ToolStatus(
+            name="npx",
+            installed=True,
+            version=version,
+            path=path
+        )
+
     def detect_spec_kit(self) -> ToolStatus:
         """检测 Spec Kit
         
@@ -305,6 +324,7 @@ class ToolDetector:
             "uv": self.detect_uv(),
             "claude-code": self.detect_claude_code(),
             "codex": self.detect_codex(),
+            "npx": self.detect_npx(),
             "spec-kit": self.detect_spec_kit(),
             "bmad-method": self.detect_bmad(),
         }

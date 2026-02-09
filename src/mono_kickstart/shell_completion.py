@@ -18,10 +18,13 @@ _mk_completion() {
     prev="${COMP_WORDS[COMP_CWORD-1]}"
     
     # 主命令
-    local commands="init upgrade install setup-shell"
-    
+    local commands="init upgrade install set-default setup-shell"
+
     # 工具列表
-    local tools="nvm node conda bun uv claude-code codex spec-kit bmad-method"
+    local tools="nvm node conda bun uv claude-code codex npx spec-kit bmad-method"
+
+    # set-default 支持的工具
+    local default_tools="node"
     
     # 如果是第一个参数，补全子命令
     if [ $COMP_CWORD -eq 1 ]; then
@@ -41,6 +44,11 @@ _mk_completion() {
                 COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
             else
                 COMPREPLY=( $(compgen -W "${tools}" -- ${cur}) )
+            fi
+            ;;
+        set-default)
+            if [ $COMP_CWORD -eq 2 ]; then
+                COMPREPLY=( $(compgen -W "${default_tools}" -- ${cur}) )
             fi
             ;;
         setup-shell)
@@ -64,9 +72,10 @@ _mk() {
         'init:初始化 Monorepo 项目和开发环境'
         'upgrade:升级已安装的开发工具'
         'install:安装开发工具'
+        'set-default:设置工具的默认版本'
         'setup-shell:配置 shell（PATH 和 Tab 补全）'
     )
-    
+
     tools=(
         'nvm:Node 版本管理器'
         'node:Node.js 运行时'
@@ -75,8 +84,14 @@ _mk() {
         'uv:Python 包管理器'
         'claude-code:Claude Code CLI'
         'codex:OpenAI Codex CLI'
+        'npx:npm 包执行器'
         'spec-kit:Spec 驱动开发工具'
         'bmad-method:BMAD 敏捷开发框架'
+    )
+
+    local -a default_tools
+    default_tools=(
+        'node:Node.js 运行时'
     )
     
     _arguments -C \
@@ -105,6 +120,12 @@ _mk() {
                         '--dry-run[模拟运行]' \
                         '--help[显示帮助信息]'
                     ;;
+                set-default)
+                    _arguments \
+                        '1: :_describe "tool" default_tools' \
+                        '2:version:' \
+                        '--help[显示帮助信息]'
+                    ;;
                 setup-shell)
                     _arguments \
                         '--help[显示帮助信息]'
@@ -125,6 +146,7 @@ FISH_COMPLETION_SCRIPT = '''# Fish completion for mk and mono-kickstart
 complete -c mk -f -n "__fish_use_subcommand" -a "init" -d "初始化 Monorepo 项目和开发环境"
 complete -c mk -f -n "__fish_use_subcommand" -a "upgrade" -d "升级已安装的开发工具"
 complete -c mk -f -n "__fish_use_subcommand" -a "install" -d "安装开发工具"
+complete -c mk -f -n "__fish_use_subcommand" -a "set-default" -d "设置工具的默认版本"
 complete -c mk -f -n "__fish_use_subcommand" -a "setup-shell" -d "配置 shell（PATH 和 Tab 补全）"
 
 # init 命令选项
@@ -135,12 +157,15 @@ complete -c mk -f -n "__fish_seen_subcommand_from init" -l force -d "强制覆�
 complete -c mk -f -n "__fish_seen_subcommand_from init" -l dry-run -d "模拟运行，不实际安装"
 
 # upgrade 和 install 命令的工具名称
-set -l tools nvm node conda bun uv claude-code codex spec-kit bmad-method
+set -l tools nvm node conda bun uv claude-code codex npx spec-kit bmad-method
 complete -c mk -f -n "__fish_seen_subcommand_from upgrade install" -a "$tools"
 
 # upgrade 和 install 命令选项
 complete -c mk -f -n "__fish_seen_subcommand_from upgrade install" -l all -d "所有工具"
 complete -c mk -f -n "__fish_seen_subcommand_from upgrade install" -l dry-run -d "模拟运行"
+
+# set-default 命令的工具名称
+complete -c mk -f -n "__fish_seen_subcommand_from set-default" -a "node" -d "Node.js 运行时"
 
 # mono-kickstart 别名（与 mk 相同的补全）
 complete -c mono-kickstart -w mk

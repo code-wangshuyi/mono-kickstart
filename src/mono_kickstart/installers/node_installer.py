@@ -33,8 +33,8 @@ class NodeInstaller(ToolInstaller):
         """
         super().__init__(platform_info, config)
         
-        # 从配置中获取版本，如果未指定则使用 LTS
-        self.node_version = config.version or "lts/*"
+        # 从配置中获取版本，如果未指定则使用 v20.2.0
+        self.node_version = config.version or "20.2.0"
     
     def _check_nvm_installed(self) -> bool:
         """检查 NVM 是否已安装

@@ -32,6 +32,7 @@ AVAILABLE_TOOLS = [
     "uv",
     "claude-code",
     "codex",
+    "npx",
     "spec-kit",
     "bmad-method",
 ]
@@ -160,6 +161,27 @@ def create_parser() -> argparse.ArgumentParser:
         help='模拟运行，不实际安装'
     )
     
+    # set-default 子命令
+    set_default_parser = subparsers.add_parser(
+        'set-default',
+        help='设置工具的默认版本（如通过 nvm 设置 Node.js 默认版本）',
+        description='设置工具的默认版本（如通过 nvm 设置 Node.js 默认版本）',
+        formatter_class=ChineseHelpFormatter,
+    )
+    set_default_parser.add_argument(
+        'tool',
+        choices=['node'],
+        metavar='TOOL',
+        help='要设置默认版本的工具名称 (可选值: node)'
+    )
+    set_default_parser.add_argument(
+        'version',
+        nargs='?',
+        default=None,
+        metavar='VERSION',
+        help='要设置的版本号（如 20.2.0），不指定则使用默认版本 20.2.0'
+    )
+
     # setup-shell 子命令
     setup_shell_parser = subparsers.add_parser(
         'setup-shell',
@@ -167,7 +189,7 @@ def create_parser() -> argparse.ArgumentParser:
         description='配置 shell（PATH 和 Tab 补全）',
         formatter_class=ChineseHelpFormatter,
     )
-    
+
     return parser
 
 
@@ -528,6 +550,91 @@ def cmd_install(args: argparse.Namespace) -> int:
         return 1
 
 
+def cmd_set_default(args: argparse.Namespace) -> int:
+    """执行 set-default 命令
+
+    通过 nvm 设置 Node.js 的默认版本。
+
+    Args:
+        args: 解析后的命令行参数
+
+    Returns:
+        退出码（0 表示成功）
+    """
+    from pathlib import Path as _Path
+
+    if args.tool != 'node':
+        logger.error(f"❌ 错误: 不支持设置 {args.tool} 的默认版本")
+        return 1
+
+    version = args.version or "20.2.0"
+
+    logger.info(f"🔧 设置 Node.js 默认版本为 {version}")
+    logger.info("")
+
+    try:
+        nvm_sh = _Path.home() / ".nvm" / "nvm.sh"
+
+        if not nvm_sh.exists():
+            logger.error("❌ 错误: NVM 未安装，无法设置 Node.js 默认版本")
+            logger.error("请先运行 mk install nvm 安装 NVM")
+            return 1
+
+        import subprocess
+
+        # 1. 检查目标版本是否已安装，未安装则先安装
+        check_cmd = f"bash -c 'source {nvm_sh} && nvm ls {version}'"
+        result = subprocess.run(
+            check_cmd, shell=True, capture_output=True, text=True, timeout=10
+        )
+
+        if result.returncode != 0 or "N/A" in result.stdout:
+            logger.info(f"📦 Node.js {version} 未安装，正在通过 nvm 安装...")
+            install_cmd = f"bash -c 'source {nvm_sh} && nvm install {version}'"
+            result = subprocess.run(
+                install_cmd, shell=True, capture_output=True, text=True, timeout=600
+            )
+            if result.returncode != 0:
+                logger.error(f"❌ 安装 Node.js {version} 失败")
+                logger.error(result.stderr or "安装命令返回非零退出码")
+                return 1
+            logger.info(f"✓ Node.js {version} 安装成功")
+
+        # 2. 设置默认版本
+        alias_cmd = f"bash -c 'source {nvm_sh} && nvm alias default {version}'"
+        result = subprocess.run(
+            alias_cmd, shell=True, capture_output=True, text=True, timeout=30
+        )
+
+        if result.returncode != 0:
+            logger.error(f"❌ 设置默认版本失败")
+            logger.error(result.stderr or "命令返回非零退出码")
+            return 1
+
+        # 3. 验证
+        verify_cmd = f"bash -c 'source {nvm_sh} && nvm current'"
+        result = subprocess.run(
+            verify_cmd, shell=True, capture_output=True, text=True, timeout=10
+        )
+
+        current = result.stdout.strip() if result.returncode == 0 else "未知"
+        logger.info(f"✓ 已将 Node.js 默认版本设置为 {version}")
+        logger.info(f"  当前版本: {current}")
+        logger.info("")
+        logger.info("💡 提示: 请重新打开终端或运行 'source ~/.nvm/nvm.sh' 使更改生效")
+        return 0
+
+    except subprocess.TimeoutExpired:
+        logger.error("❌ 命令执行超时")
+        return 1
+    except KeyboardInterrupt:
+        logger.error("\n❌ 用户中断操作")
+        return 130
+    except Exception as e:
+        logger.error(f"❌ 设置默认版本过程中发生错误: {e}")
+        return 1
+
+
 def cmd_setup_shell(args: argparse.Namespace) -> int:
     """执行 setup-shell 命令
     
@@ -570,6 +677,8 @@ def main() -> int:
         return cmd_upgrade(args)
     elif args.command == 'install':
         return cmd_install(args)
+    elif args.command == 'set-default':
+        return cmd_set_default(args)
     elif args.command == 'setup-shell':
         return cmd_setup_shell(args)
     else:

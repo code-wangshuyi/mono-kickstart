@@ -10,6 +10,7 @@ from .bun_installer import BunInstaller
 from .uv_installer import UVInstaller
 from .claude_installer import ClaudeCodeInstaller
 from .codex_installer import CodexInstaller
+from .npx_installer import NpxInstaller
 from .spec_kit_installer import SpecKitInstaller
 from .bmad_installer import BMadInstaller
 
@@ -21,6 +22,7 @@ __all__ = [
     "UVInstaller",
     "ClaudeCodeInstaller",
     "CodexInstaller",
+    "NpxInstaller",
     "SpecKitInstaller",
     "BMadInstaller",
 ]

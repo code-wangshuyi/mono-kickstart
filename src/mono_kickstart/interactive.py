@@ -34,6 +34,7 @@ AVAILABLE_TOOLS = [
     {"name": "uv", "value": "uv", "checked": True},
     {"name": "Claude Code CLI", "value": "claude-code", "checked": True},
     {"name": "Codex CLI", "value": "codex", "checked": True},
+    {"name": "npx", "value": "npx", "checked": True},
     {"name": "Spec Kit", "value": "spec-kit", "checked": True},
     {"name": "BMad Method", "value": "bmad-method", "checked": True},
 ]

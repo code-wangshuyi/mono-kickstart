@@ -20,6 +20,7 @@ from .installers.bun_installer import BunInstaller
 from .installers.claude_installer import ClaudeCodeInstaller
 from .installers.codex_installer import CodexInstaller
 from .installers.conda_installer import CondaInstaller
+from .installers.npx_installer import NpxInstaller
 from .installers.node_installer import NodeInstaller
 from .installers.nvm_installer import NVMInstaller
 from .installers.spec_kit_installer import SpecKitInstaller
@@ -39,8 +40,9 @@ INSTALL_ORDER = [
     "uv",            # 5. 安装 uv
     "claude-code",   # 6. 安装 Claude Code CLI
     "codex",         # 7. 安装 Codex CLI（可能依赖 Bun）
-    "spec-kit",      # 8. 安装 Spec Kit（依赖 uv）
-    "bmad-method",   # 9. 安装 BMad Method（依赖 Node.js/Bun）
+    "npx",           # 8. 安装 npx（依赖 Node.js/npm）
+    "spec-kit",      # 9. 安装 Spec Kit（依赖 uv）
+    "bmad-method",   # 10. 安装 BMad Method（依赖 Node.js/Bun/npx）
 ]
 
 
@@ -112,6 +114,7 @@ class InstallOrchestrator:
             "uv": UVInstaller,
             "claude-code": ClaudeCodeInstaller,
             "codex": CodexInstaller,
+            "npx": NpxInstaller,
             "spec-kit": SpecKitInstaller,
             "bmad-method": BMadInstaller,
         }
