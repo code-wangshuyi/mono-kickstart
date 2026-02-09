@@ -1,236 +1,581 @@
 """
 CLI 入口模块
 
-定义命令行接口和子命令。
+定义命令行接口和子命令（使用 argparse 标准库）。
 """
 
+import argparse
+import logging
 import os
+import sys
 from pathlib import Path
 from typing import Optional
 
-import click
-import typer
-import typer.core
-import typer.rich_utils as ru
-
-# 中文化帮助面板标题
-ru.OPTIONS_PANEL_TITLE = "选项"
-ru.COMMANDS_PANEL_TITLE = "命令"
-ru.ARGUMENTS_PANEL_TITLE = "参数"
-ru.DEFAULT_STRING = "[默认值: {}]"
-ru.REQUIRED_LONG_STRING = "[必填]"
+from mono_kickstart import __version__
 
 
-def _chinese_help_option(self, ctx):
-    """返回中文帮助选项。"""
-    help_options = self.get_help_option_names(ctx)
-    if not help_options or not self.add_help_option:
-        return None
-
-    def show_help(ctx, param, value):
-        if value and not ctx.resilient_parsing:
-            click.echo(ctx.get_help(), color=ctx.color)
-            ctx.exit()
-
-    return click.Option(
-        help_options,
-        is_flag=True,
-        is_eager=True,
-        expose_value=False,
-        callback=show_help,
-        help="显示帮助信息并退出。",
-    )
-
-
-class ChineseGroup(typer.core.TyperGroup):
-    get_help_option = _chinese_help_option
-
-
-class ChineseCommand(typer.core.TyperCommand):
-    get_help_option = _chinese_help_option
-
-
-app = typer.Typer(
-    name="mono-kickstart",
-    help="Monorepo 项目模板脚手架 CLI 工具",
-    cls=ChineseGroup,
-    add_completion=True,
-    context_settings={"help_option_names": ["-h", "--help"]},
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(message)s',
+    handlers=[logging.StreamHandler(sys.stdout)]
 )
+logger = logging.getLogger(__name__)
 
 
+# 可用工具列表（用于补全）
 AVAILABLE_TOOLS = [
-    ("nvm", "Node 版本管理器"),
-    ("node", "Node.js 运行时"),
-    ("conda", "Python 环境管理器"),
-    ("bun", "JavaScript 运行时和包管理器"),
-    ("uv", "Python 包管理器"),
-    ("claude-code", "Claude Code CLI"),
-    ("codex", "OpenAI Codex CLI"),
-    ("spec-kit", "Spec 驱动开发工具"),
-    ("bmad-method", "BMAD 敏捷开发框架"),
+    "nvm",
+    "node",
+    "conda",
+    "bun",
+    "uv",
+    "claude-code",
+    "codex",
+    "spec-kit",
+    "bmad-method",
 ]
 
 
-def complete_tool_name(incomplete: str) -> list[tuple[str, str]]:
-    """返回匹配的工具名称和描述，用于 Tab 补全。"""
-    return [(name, desc) for name, desc in AVAILABLE_TOOLS if name.startswith(incomplete)]
+class ChineseHelpFormatter(argparse.RawDescriptionHelpFormatter):
+    """中文化的帮助信息格式器"""
+    
+    def _format_usage(self, usage, actions, groups, prefix):
+        if prefix is None:
+            prefix = '用法: '
+        return super()._format_usage(usage, actions, groups, prefix)
 
 
-@app.command(cls=ChineseCommand)
-def init(
-    config: Optional[str] = typer.Option(None, "--config", help="配置文件路径"),
-    save_config: bool = typer.Option(False, "--save-config", help="保存配置到 .kickstartrc"),
-    interactive: bool = typer.Option(False, "--interactive", help="交互式配置"),
-    force: bool = typer.Option(False, "--force", help="强制覆盖已有配置"),
-    dry_run: bool = typer.Option(False, "--dry-run", help="模拟运行，不实际安装"),
-) -> None:
-    """初始化 Monorepo 项目和开发环境"""
-    typer.echo("🚀 Mono-Kickstart - 初始化 Monorepo 项目")
-    typer.echo("此功能将在后续任务中实现")
+def create_parser() -> argparse.ArgumentParser:
+    """创建主解析器和子命令解析器
+    
+    Returns:
+        配置好的 ArgumentParser 对象
+    """
+    # 主解析器
+    parser = argparse.ArgumentParser(
+        prog='mk',
+        description='Mono-Kickstart - Monorepo 项目模板脚手架 CLI 工具\n\n'
+                    '通过一条命令快速初始化标准化的 Monorepo 工程，\n'
+                    '自动完成开发环境搭建与工具链安装。',
+        formatter_class=ChineseHelpFormatter,
+        add_help=True,
+    )
+    
+    parser.add_argument(
+        '--version',
+        action='version',
+        version=f'Mono-Kickstart version {__version__}',
+        help='显示版本号'
+    )
+    
+    # 子命令解析器
+    subparsers = parser.add_subparsers(
+        title='可用命令',
+        dest='command',
+        help='子命令帮助信息'
+    )
+    
+    # init 子命令
+    init_parser = subparsers.add_parser(
+        'init',
+        help='初始化 Monorepo 项目和开发环境',
+        description='初始化 Monorepo 项目和开发环境',
+        formatter_class=ChineseHelpFormatter,
+    )
+    init_parser.add_argument(
+        '--config',
+        type=str,
+        metavar='PATH',
+        help='配置文件路径'
+    )
+    init_parser.add_argument(
+        '--save-config',
+        action='store_true',
+        help='保存配置到 .kickstartrc'
+    )
+    init_parser.add_argument(
+        '--interactive',
+        action='store_true',
+        help='交互式配置'
+    )
+    init_parser.add_argument(
+        '--force',
+        action='store_true',
+        help='强制覆盖已有配置'
+    )
+    init_parser.add_argument(
+        '--dry-run',
+        action='store_true',
+        help='模拟运行，不实际安装'
+    )
+    
+    # upgrade 子命令
+    upgrade_parser = subparsers.add_parser(
+        'upgrade',
+        help='升级已安装的开发工具',
+        description='升级已安装的开发工具',
+        formatter_class=ChineseHelpFormatter,
+    )
+    upgrade_parser.add_argument(
+        'tool',
+        nargs='?',
+        choices=AVAILABLE_TOOLS,
+        metavar='TOOL',
+        help=f'要升级的工具名称 (可选值: {", ".join(AVAILABLE_TOOLS)})'
+    )
+    upgrade_parser.add_argument(
+        '--all',
+        action='store_true',
+        help='升级所有工具'
+    )
+    upgrade_parser.add_argument(
+        '--dry-run',
+        action='store_true',
+        help='模拟运行，不实际升级'
+    )
+    
+    # install 子命令
+    install_parser = subparsers.add_parser(
+        'install',
+        help='安装开发工具',
+        description='安装开发工具',
+        formatter_class=ChineseHelpFormatter,
+    )
+    install_parser.add_argument(
+        'tool',
+        nargs='?',
+        choices=AVAILABLE_TOOLS,
+        metavar='TOOL',
+        help=f'要安装的工具名称 (可选值: {", ".join(AVAILABLE_TOOLS)})'
+    )
+    install_parser.add_argument(
+        '--all',
+        action='store_true',
+        help='安装所有工具'
+    )
+    install_parser.add_argument(
+        '--dry-run',
+        action='store_true',
+        help='模拟运行，不实际安装'
+    )
+    
+    # setup-shell 子命令
+    setup_shell_parser = subparsers.add_parser(
+        'setup-shell',
+        help='配置 shell（PATH 和 Tab 补全）',
+        description='配置 shell（PATH 和 Tab 补全）',
+        formatter_class=ChineseHelpFormatter,
+    )
+    
+    return parser
 
 
-@app.command(cls=ChineseCommand)
-def upgrade(
-    tool: Optional[str] = typer.Argument(
-        None, help="要升级的工具名称", autocompletion=complete_tool_name
-    ),
-    all: bool = typer.Option(False, "--all", help="升级所有工具"),
-    dry_run: bool = typer.Option(False, "--dry-run", help="模拟运行，不实际升级"),
-) -> None:
-    """升级已安装的开发工具"""
-    typer.echo("🔄 Mono-Kickstart - 升级开发工具")
-    typer.echo("此功能将在后续任务中实现")
+def cmd_init(args: argparse.Namespace) -> int:
+    """执行 init 命令
+    
+    Args:
+        args: 解析后的命令行参数
+        
+    Returns:
+        退出码（0 表示成功）
+    """
+    from mono_kickstart.platform_detector import PlatformDetector
+    from mono_kickstart.config import ConfigManager
+    from mono_kickstart.orchestrator import InstallOrchestrator
+    
+    logger.info("🚀 Mono-Kickstart - 初始化 Monorepo 项目")
+    logger.info("")
+    
+    try:
+        # 1. 检测平台
+        logger.info("📋 检测平台信息...")
+        detector = PlatformDetector()
+        
+        if not detector.is_supported():
+            platform_info = detector.detect_all()
+            logger.error(f"❌ 错误: 不支持的平台 ({platform_info.os.value}/{platform_info.arch.value})")
+            logger.error("支持的平台:")
+            logger.error("  - macOS ARM64")
+            logger.error("  - macOS x86_64")
+            logger.error("  - Linux x86_64")
+            return 1
+        
+        platform_info = detector.detect_all()
+        logger.info(f"✓ 平台: {platform_info.os.value}/{platform_info.arch.value}")
+        logger.info(f"✓ Shell: {platform_info.shell.value}")
+        logger.info("")
+        
+        # 2. 加载配置
+        config_manager = ConfigManager()
+        
+        # 如果使用交互式模式
+        if args.interactive:
+            from mono_kickstart.interactive import InteractiveConfigurator
+            
+            # 加载默认配置作为交互式配置的基础
+            try:
+                default_config = config_manager.load_with_priority(
+                    cli_config=Path(args.config) if args.config else None,
+                    project_config=Path(".kickstartrc"),
+                    user_config=Path.home() / ".kickstartrc"
+                )
+            except Exception:
+                # 如果加载失败，使用空配置
+                default_config = config_manager.load_from_defaults()
+            
+            # 运行交互式配置向导
+            configurator = InteractiveConfigurator(default_config)
+            config = configurator.run_wizard()
+            
+            # 显示配置摘要并确认
+            if not configurator.confirm_config(config):
+                logger.info("❌ 用户取消操作")
+                return 0
+            
+            logger.info("")
+        else:
+            # 非交互式模式：按优先级加载配置
+            logger.info("📋 加载配置...")
+            
+            try:
+                cli_config_path = Path(args.config) if args.config else None
+                config = config_manager.load_with_priority(
+                    cli_config=cli_config_path,
+                    project_config=Path(".kickstartrc"),
+                    user_config=Path.home() / ".kickstartrc"
+                )
+                
+                # 验证配置
+                errors = config_manager.validate(config)
+                if errors:
+                    logger.error("❌ 配置验证失败:")
+                    for error in errors:
+                        logger.error(f"  - {error}")
+                    return 2
+                
+                logger.info("✓ 配置加载成功")
+                logger.info("")
+                
+            except FileNotFoundError as e:
+                logger.error(f"❌ 配置文件不存在: {e}")
+                return 2
+            except Exception as e:
+                logger.error(f"❌ 配置加载失败: {e}")
+                logger.debug("详细错误信息:", exc_info=True)
+                return 2
+        
+        # 3. 保存配置（如果需要）
+        if args.save_config:
+            try:
+                config_path = Path(".kickstartrc")
+                config_manager.save_to_file(config, config_path)
+                logger.info(f"✓ 配置已保存到 {config_path}")
+                logger.info("")
+            except Exception as e:
+                logger.warning(f"⚠️  警告: 配置保存失败: {e}")
+                logger.info("")
+        
+        # 4. 创建安装编排器
+        orchestrator = InstallOrchestrator(
+            config=config,
+            platform_info=platform_info,
+            dry_run=args.dry_run
+        )
+        
+        # 5. 执行初始化流程
+        if args.dry_run:
+            logger.info("🔍 [模拟运行模式]")
+            logger.info("")
+        
+        logger.info("🚀 开始初始化...")
+        logger.info("")
+        
+        # 执行完整初始化流程
+        reports = orchestrator.run_init(
+            project_name=config.project.name,
+            force=args.force
+        )
+        
+        # 打印摘要
+        orchestrator.print_summary(reports)
+        
+        # 检查是否有失败的任务
+        from mono_kickstart.installer_base import InstallResult
+        failed_count = sum(1 for r in reports.values() if r.result == InstallResult.FAILED)
+        
+        if failed_count == len(reports):
+            # 所有任务都失败
+            logger.error("❌ 所有任务都失败了")
+            return 3
+        elif failed_count > 0:
+            # 部分任务失败
+            logger.warning(f"⚠️  {failed_count} 个任务失败，但其他任务已成功完成")
+            return 0
+        else:
+            # 全部成功
+            logger.info("✨ 初始化完成！")
+            return 0
+            
+    except KeyboardInterrupt:
+        logger.error("\n❌ 用户中断操作")
+        return 130
+    except Exception as e:
+        logger.error(f"❌ 初始化过程中发生错误: {e}")
+        logger.debug("详细错误信息:", exc_info=True)
+        return 1
 
 
-@app.command(cls=ChineseCommand)
-def install(
-    tool: Optional[str] = typer.Argument(
-        None, help="要安装的工具名称", autocompletion=complete_tool_name
-    ),
-    all_tools: bool = typer.Option(False, "--all", help="安装所有工具"),
-    dry_run: bool = typer.Option(False, "--dry-run", help="模拟运行，不实际安装"),
-) -> None:
-    """安装开发工具"""
-    typer.echo("📦 Mono-Kickstart - 安装开发工具")
-    typer.echo("此功能将在后续任务中实现")
+def cmd_upgrade(args: argparse.Namespace) -> int:
+    """执行 upgrade 命令
+    
+    Args:
+        args: 解析后的命令行参数
+        
+    Returns:
+        退出码（0 表示成功）
+    """
+    from mono_kickstart.platform_detector import PlatformDetector
+    from mono_kickstart.config import ConfigManager
+    from mono_kickstart.orchestrator import InstallOrchestrator
+    from mono_kickstart.tool_detector import ToolDetector
+    
+    logger.info("🔄 Mono-Kickstart - 升级开发工具")
+    logger.info("")
+    
+    try:
+        # 1. 检测平台
+        detector = PlatformDetector()
+        if not detector.is_supported():
+            platform_info = detector.detect_all()
+            logger.error(f"❌ 错误: 不支持的平台 ({platform_info.os.value}/{platform_info.arch.value})")
+            return 1
+        
+        platform_info = detector.detect_all()
+        
+        # 2. 加载配置
+        config_manager = ConfigManager()
+        try:
+            config = config_manager.load_with_priority(
+                cli_config=None,
+                project_config=Path(".kickstartrc"),
+                user_config=Path.home() / ".kickstartrc"
+            )
+        except Exception as e:
+            logger.warning(f"⚠️  警告: 配置加载失败，使用默认配置: {e}")
+            config = config_manager.load_from_defaults()
+        
+        # 3. 创建安装编排器
+        orchestrator = InstallOrchestrator(
+            config=config,
+            platform_info=platform_info,
+            dry_run=args.dry_run
+        )
+        
+        # 4. 确定要升级的工具
+        if args.dry_run:
+            logger.info("🔍 [模拟运行模式]")
+            logger.info("")
+        
+        # 如果指定了 --all 或没有指定工具名称，升级所有已安装的工具
+        tool_name = None
+        if not args.all and args.tool:
+            tool_name = args.tool
+            logger.info(f"🔄 升级工具: {tool_name}")
+        else:
+            logger.info("🔄 升级所有已安装的工具")
+            # 检测已安装的工具
+            tool_detector = ToolDetector()
+            all_tools = tool_detector.detect_all_tools()
+            installed_tools = [name for name, status in all_tools.items() if status.installed]
+            
+            if not installed_tools:
+                logger.warning("⚠️  没有检测到已安装的工具")
+                return 0
+            
+            logger.info(f"检测到 {len(installed_tools)} 个已安装的工具:")
+            for tool in installed_tools:
+                logger.info(f"  - {tool}")
+        
+        logger.info("")
+        
+        # 5. 执行升级流程
+        reports = orchestrator.run_upgrade(tool_name=tool_name)
+        
+        # 打印摘要
+        orchestrator.print_summary(reports)
+        
+        # 检查是否有失败的任务
+        from mono_kickstart.installer_base import InstallResult
+        failed_count = sum(1 for r in reports.values() if r.result == InstallResult.FAILED)
+        
+        if failed_count == len(reports) and len(reports) > 0:
+            # 所有任务都失败
+            logger.error("❌ 所有任务都失败了")
+            return 3
+        elif failed_count > 0:
+            # 部分任务失败
+            logger.warning(f"⚠️  {failed_count} 个任务失败，但其他任务已成功完成")
+            return 0
+        else:
+            # 全部成功
+            logger.info("✨ 升级完成！")
+            return 0
+            
+    except KeyboardInterrupt:
+        logger.error("\n❌ 用户中断操作")
+        return 130
+    except Exception as e:
+        logger.error(f"❌ 升级过程中发生错误: {e}")
+        logger.debug("详细错误信息:", exc_info=True)
+        return 1
 
 
-BASH_COMPLETION_SCRIPT = r'''_mk_completion() {
-    local cmd_args="${COMP_WORDS[*]:0:$COMP_CWORD+1}"
-    local IFS=$'\n'
-    local output
-    output=$( env _TYPER_COMPLETE_ARGS="$cmd_args" _MK_COMPLETE=complete_zsh $1 2>/dev/null )
+def cmd_install(args: argparse.Namespace) -> int:
+    """执行 install 命令
+    
+    Args:
+        args: 解析后的命令行参数
+        
+    Returns:
+        退出码（0 表示成功）
+    """
+    from mono_kickstart.platform_detector import PlatformDetector
+    from mono_kickstart.config import ConfigManager
+    from mono_kickstart.orchestrator import InstallOrchestrator
+    
+    logger.info("📦 Mono-Kickstart - 安装开发工具")
+    logger.info("")
+    
+    try:
+        # 1. 检测平台
+        detector = PlatformDetector()
+        if not detector.is_supported():
+            platform_info = detector.detect_all()
+            logger.error(f"❌ 错误: 不支持的平台 ({platform_info.os.value}/{platform_info.arch.value})")
+            return 1
+        
+        platform_info = detector.detect_all()
+        
+        # 2. 加载配置
+        config_manager = ConfigManager()
+        try:
+            config = config_manager.load_with_priority(
+                cli_config=None,
+                project_config=Path(".kickstartrc"),
+                user_config=Path.home() / ".kickstartrc"
+            )
+        except Exception as e:
+            logger.warning(f"⚠️  警告: 配置加载失败，使用默认配置: {e}")
+            config = config_manager.load_from_defaults()
+        
+        # 3. 创建安装编排器
+        orchestrator = InstallOrchestrator(
+            config=config,
+            platform_info=platform_info,
+            dry_run=args.dry_run
+        )
+        
+        # 4. 确定要安装的工具
+        if args.dry_run:
+            logger.info("🔍 [模拟运行模式]")
+            logger.info("")
+        
+        if not args.all and not args.tool:
+            logger.error("❌ 错误: 请指定要安装的工具名称或使用 --all 安装所有工具")
+            return 1
+        
+        # 5. 执行安装流程
+        if args.all:
+            # 安装所有工具
+            logger.info("📦 安装所有工具")
+            logger.info("")
+            reports = orchestrator.install_all_tools()
+        else:
+            # 安装单个工具
+            tool_name = args.tool
+            logger.info(f"📦 安装工具: {tool_name}")
+            logger.info("")
+            report = orchestrator.install_tool(tool_name)
+            reports = {tool_name: report}
+        
+        # 打印摘要
+        orchestrator.print_summary(reports)
+        
+        # 检查是否有失败的任务
+        from mono_kickstart.installer_base import InstallResult
+        failed_count = sum(1 for r in reports.values() if r.result == InstallResult.FAILED)
+        
+        if failed_count == len(reports) and len(reports) > 0:
+            # 所有任务都失败
+            logger.error("❌ 所有任务都失败了")
+            return 3
+        elif failed_count > 0:
+            # 部分任务失败
+            logger.warning(f"⚠️  {failed_count} 个任务失败，但其他任务已成功完成")
+            return 0
+        else:
+            # 全部成功
+            logger.info("✨ 安装完成！")
+            return 0
+            
+    except KeyboardInterrupt:
+        logger.error("\n❌ 用户中断操作")
+        return 130
+    except Exception as e:
+        logger.error(f"❌ 安装过程中发生错误: {e}")
+        logger.debug("详细错误信息:", exc_info=True)
+        return 1
 
-    local has_pairs
-    has_pairs=$(echo "$output" | grep -c '".*":".*"' || true)
-    if [ "$has_pairs" -eq 0 ] && [ "$COMP_CWORD" -gt 1 ]; then
-        output=$( env _TYPER_COMPLETE_ARGS="${cmd_args}--" _MK_COMPLETE=complete_zsh $1 2>/dev/null )
-    fi
 
-    local completions=() pairs=() max_len=0
-    while IFS= read -r line; do
-        if [[ "$line" =~ \"([^\"]+)\":\"([^\"]+)\" ]]; then
-            completions+=("${BASH_REMATCH[1]}")
-            pairs+=("${BASH_REMATCH[1]}|${BASH_REMATCH[2]}")
-            (( ${#BASH_REMATCH[1]} > max_len )) && max_len=${#BASH_REMATCH[1]}
-        fi
-    done <<< "$output"
-
-    if [ ${#completions[@]} -eq 1 ]; then
-        COMPREPLY=("${completions[0]}")
-    elif [ ${#completions[@]} -gt 1 ]; then
-        printf '\n'
-        for p in "${pairs[@]}"; do
-            local val="${p%%|*}" desc="${p#*|}"
-            printf '  %-'"${max_len}"'s  -- %s\n' "$val" "$desc"
-        done
-        printf '%s%s' "${PS1@P}" "${COMP_LINE}"
-        COMPREPLY=("${completions[@]}")
-    fi
-    return 0
-}
-complete -o default -o nosort -F _mk_completion mk
-complete -o default -o nosort -F _mk_completion mono-kickstart
-'''
-
-ZSH_COMPLETION_SCRIPT = r'''#compdef mk mono-kickstart
-_mk_completion() {
-  eval $(env _TYPER_COMPLETE_ARGS="${words[1,$CURRENT]}" _MK_COMPLETE=complete_zsh mk)
-}
-compdef _mk_completion mk
-compdef _mk_completion mono-kickstart
-'''
+def cmd_setup_shell(args: argparse.Namespace) -> int:
+    """执行 setup-shell 命令
+    
+    配置 shell 环境（PATH 和 Tab 补全）
+    
+    Args:
+        args: 解析后的命令行参数
+        
+    Returns:
+        退出码（0 表示成功）
+    """
+    from mono_kickstart.shell_completion import setup_shell_completion
+    
+    try:
+        setup_shell_completion()
+        return 0
+    except Exception as e:
+        print(f"错误: {e}", file=sys.stderr)
+        return 1
 
 
-@app.command(name="setup-shell", cls=ChineseCommand)
-def setup_shell() -> None:
-    """配置 shell（PATH 和 Tab 补全）"""
-    shell = os.environ.get("SHELL", "")
-    is_zsh = "zsh" in shell
-
-    if is_zsh:
-        rc_file = Path.home() / ".zshrc"
-        comp_dir = Path.home() / ".zsh_completions"
-        comp_file = comp_dir / "_mk"
-        comp_script = ZSH_COMPLETION_SCRIPT
-        source_line = f'fpath=({comp_dir} $fpath) && autoload -Uz compinit && compinit'
+def main() -> int:
+    """主入口函数
+    
+    Returns:
+        退出码（0 表示成功，非 0 表示失败）
+    """
+    parser = create_parser()
+    args = parser.parse_args()
+    
+    # 如果没有指定子命令，显示帮助信息
+    if not args.command:
+        parser.print_help()
+        return 0
+    
+    # 根据子命令调用相应的处理函数
+    if args.command == 'init':
+        return cmd_init(args)
+    elif args.command == 'upgrade':
+        return cmd_upgrade(args)
+    elif args.command == 'install':
+        return cmd_install(args)
+    elif args.command == 'setup-shell':
+        return cmd_setup_shell(args)
     else:
-        rc_file = Path.home() / ".bashrc"
-        comp_dir = Path.home() / ".bash_completions"
-        comp_file = comp_dir / "mk.sh"
-        comp_script = BASH_COMPLETION_SCRIPT
-        source_line = f"source '{comp_file}'"
-
-    # 1. 配置 PATH
-    path_line = 'export PATH="$HOME/.local/bin:$PATH"'
-    rc_content = rc_file.read_text() if rc_file.exists() else ""
-
-    if ".local/bin" not in rc_content:
-        with open(rc_file, "a") as f:
-            f.write(f"\n{path_line}\n")
-        typer.echo(f"已将 PATH 配置写入 {rc_file}")
-
-    # 2. 安装补全脚本
-    comp_dir.mkdir(parents=True, exist_ok=True)
-    comp_file.write_text(comp_script)
-    typer.echo(f"已安装补全脚本到 {comp_file}")
-
-    # 3. 确保 rc 文件加载补全
-    rc_content = rc_file.read_text()
-    if str(comp_file) not in rc_content and "mk_completion" not in rc_content:
-        with open(rc_file, "a") as f:
-            f.write(f"\n{source_line}\n")
-        typer.echo(f"已将补全加载配置写入 {rc_file}")
-
-    typer.echo(f"\n请运行以下命令使配置生效：source {rc_file}")
-
-
-def version_callback(value: bool):
-    """显示版本信息"""
-    if value:
-        from mono_kickstart import __version__
-        typer.echo(f"Mono-Kickstart version {__version__}")
-        raise typer.Exit()
-
-
-@app.callback()
-def main(
-    version: Optional[bool] = typer.Option(
-        None,
-        "--version",
-        callback=version_callback,
-        is_eager=True,
-        help="显示版本号",
-    ),
-):
-    """
-    Mono-Kickstart - Monorepo 项目模板脚手架 CLI 工具
-
-    通过一条命令快速初始化标准化的 Monorepo 工程，自动完成开发环境搭建与工具链安装。
-    """
-    pass
+        parser.print_help()
+        return 1
 
 
 if __name__ == "__main__":
-    app()
+    sys.exit(main())

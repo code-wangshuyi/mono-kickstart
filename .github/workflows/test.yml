@@ -1,0 +1,60 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    name: Test on Python ${{ matrix.python-version }} - ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ['3.11', '3.12']
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install uv
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+    
+    - name: Install dependencies
+      run: |
+        uv pip install --system -e ".[dev]"
+    
+    - name: Run unit tests
+      run: |
+        pytest tests/unit/ -v --no-cov
+    
+    - name: Run property tests
+      run: |
+        pytest tests/property/ -v --no-cov
+    
+    - name: Run integration tests
+      run: |
+        pytest tests/integration/ -v --no-cov
+    
+    - name: Run all tests with coverage
+      run: |
+        pytest tests/ --cov=mono_kickstart --cov-report=xml --cov-report=term-missing
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-${{ matrix.os }}-py${{ matrix.python-version }}
+        fail_ci_if_error: false
