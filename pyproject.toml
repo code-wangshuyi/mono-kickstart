@@ -37,8 +37,8 @@ dev = [
 ]
 
 [project.scripts]
-mk = "mono_kickstart.cli:main"
-mono-kickstart = "mono_kickstart.cli:main"
+mk = "mono_kickstart.cli:app"
+mono-kickstart = "mono_kickstart.cli:app"
 
 [project.urls]
 Homepage = "https://github.com/mono-kickstart/mono-kickstart"
