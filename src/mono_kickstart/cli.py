@@ -54,9 +54,27 @@ app = typer.Typer(
     name="mono-kickstart",
     help="Monorepo 项目模板脚手架 CLI 工具",
     cls=ChineseGroup,
-    add_completion=False,
+    add_completion=True,
     context_settings={"help_option_names": ["-h", "--help"]},
 )
+
+
+AVAILABLE_TOOLS = [
+    ("nvm", "Node 版本管理器"),
+    ("node", "Node.js 运行时"),
+    ("conda", "Python 环境管理器"),
+    ("bun", "JavaScript 运行时和包管理器"),
+    ("uv", "Python 包管理器"),
+    ("claude-code", "Claude Code CLI"),
+    ("codex", "OpenAI Codex CLI"),
+    ("spec-kit", "Spec 驱动开发工具"),
+    ("bmad-method", "BMAD 敏捷开发框架"),
+]
+
+
+def complete_tool_name(incomplete: str) -> list[tuple[str, str]]:
+    """返回匹配的工具名称和描述，用于 Tab 补全。"""
+    return [(name, desc) for name, desc in AVAILABLE_TOOLS if name.startswith(incomplete)]
 
 
 @app.command(cls=ChineseCommand)
@@ -74,7 +92,9 @@ def init(
 
 @app.command(cls=ChineseCommand)
 def upgrade(
-    tool: Optional[str] = typer.Argument(None, help="要升级的工具名称"),
+    tool: Optional[str] = typer.Argument(
+        None, help="要升级的工具名称", autocompletion=complete_tool_name
+    ),
     all: bool = typer.Option(False, "--all", help="升级所有工具"),
     dry_run: bool = typer.Option(False, "--dry-run", help="模拟运行，不实际升级"),
 ) -> None:
@@ -83,28 +103,107 @@ def upgrade(
     typer.echo("此功能将在后续任务中实现")
 
 
+@app.command(cls=ChineseCommand)
+def install(
+    tool: Optional[str] = typer.Argument(
+        None, help="要安装的工具名称", autocompletion=complete_tool_name
+    ),
+    all_tools: bool = typer.Option(False, "--all", help="安装所有工具"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="模拟运行，不实际安装"),
+) -> None:
+    """安装开发工具"""
+    typer.echo("📦 Mono-Kickstart - 安装开发工具")
+    typer.echo("此功能将在后续任务中实现")
+
+
+BASH_COMPLETION_SCRIPT = r'''_mk_completion() {
+    local cmd_args="${COMP_WORDS[*]:0:$COMP_CWORD+1}"
+    local IFS=$'\n'
+    local output
+    output=$( env _TYPER_COMPLETE_ARGS="$cmd_args" _MK_COMPLETE=complete_zsh $1 2>/dev/null )
+
+    local has_pairs
+    has_pairs=$(echo "$output" | grep -c '".*":".*"' || true)
+    if [ "$has_pairs" -eq 0 ] && [ "$COMP_CWORD" -gt 1 ]; then
+        output=$( env _TYPER_COMPLETE_ARGS="${cmd_args}--" _MK_COMPLETE=complete_zsh $1 2>/dev/null )
+    fi
+
+    local completions=() pairs=() max_len=0
+    while IFS= read -r line; do
+        if [[ "$line" =~ \"([^\"]+)\":\"([^\"]+)\" ]]; then
+            completions+=("${BASH_REMATCH[1]}")
+            pairs+=("${BASH_REMATCH[1]}|${BASH_REMATCH[2]}")
+            (( ${#BASH_REMATCH[1]} > max_len )) && max_len=${#BASH_REMATCH[1]}
+        fi
+    done <<< "$output"
+
+    if [ ${#completions[@]} -eq 1 ]; then
+        COMPREPLY=("${completions[0]}")
+    elif [ ${#completions[@]} -gt 1 ]; then
+        printf '\n'
+        for p in "${pairs[@]}"; do
+            local val="${p%%|*}" desc="${p#*|}"
+            printf '  %-'"${max_len}"'s  -- %s\n' "$val" "$desc"
+        done
+        printf '%s%s' "${PS1@P}" "${COMP_LINE}"
+        COMPREPLY=("${completions[@]}")
+    fi
+    return 0
+}
+complete -o default -o nosort -F _mk_completion mk
+complete -o default -o nosort -F _mk_completion mono-kickstart
+'''
+
+ZSH_COMPLETION_SCRIPT = r'''#compdef mk mono-kickstart
+_mk_completion() {
+  eval $(env _TYPER_COMPLETE_ARGS="${words[1,$CURRENT]}" _MK_COMPLETE=complete_zsh mk)
+}
+compdef _mk_completion mk
+compdef _mk_completion mono-kickstart
+'''
+
+
 @app.command(name="setup-shell", cls=ChineseCommand)
 def setup_shell() -> None:
-    """将 ~/.local/bin 添加到 shell PATH 配置"""
+    """配置 shell（PATH 和 Tab 补全）"""
     shell = os.environ.get("SHELL", "")
-    if "zsh" in shell:
+    is_zsh = "zsh" in shell
+
+    if is_zsh:
         rc_file = Path.home() / ".zshrc"
+        comp_dir = Path.home() / ".zsh_completions"
+        comp_file = comp_dir / "_mk"
+        comp_script = ZSH_COMPLETION_SCRIPT
+        source_line = f'fpath=({comp_dir} $fpath) && autoload -Uz compinit && compinit'
     else:
         rc_file = Path.home() / ".bashrc"
+        comp_dir = Path.home() / ".bash_completions"
+        comp_file = comp_dir / "mk.sh"
+        comp_script = BASH_COMPLETION_SCRIPT
+        source_line = f"source '{comp_file}'"
 
+    # 1. 配置 PATH
     path_line = 'export PATH="$HOME/.local/bin:$PATH"'
+    rc_content = rc_file.read_text() if rc_file.exists() else ""
 
-    if rc_file.exists():
-        content = rc_file.read_text()
-        if ".local/bin" in content:
-            typer.echo(f"{rc_file} 中已包含 .local/bin 配置，无需重复添加。")
-            return
+    if ".local/bin" not in rc_content:
+        with open(rc_file, "a") as f:
+            f.write(f"\n{path_line}\n")
+        typer.echo(f"已将 PATH 配置写入 {rc_file}")
 
-    with open(rc_file, "a") as f:
-        f.write(f"\n{path_line}\n")
+    # 2. 安装补全脚本
+    comp_dir.mkdir(parents=True, exist_ok=True)
+    comp_file.write_text(comp_script)
+    typer.echo(f"已安装补全脚本到 {comp_file}")
 
-    typer.echo(f"已将 PATH 配置写入 {rc_file}")
-    typer.echo(f"请运行以下命令使配置生效：source {rc_file}")
+    # 3. 确保 rc 文件加载补全
+    rc_content = rc_file.read_text()
+    if str(comp_file) not in rc_content and "mk_completion" not in rc_content:
+        with open(rc_file, "a") as f:
+            f.write(f"\n{source_line}\n")
+        typer.echo(f"已将补全加载配置写入 {rc_file}")
+
+    typer.echo(f"\n请运行以下命令使配置生效：source {rc_file}")
 
 
 def version_callback(value: bool):
