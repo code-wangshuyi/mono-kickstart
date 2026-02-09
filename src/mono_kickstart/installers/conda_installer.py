@@ -50,7 +50,7 @@ class CondaInstaller(ToolInstaller):
         Raises:
             ValueError: 如果平台不支持
         """
-        base_url = "https://repo.anaconda.com/miniconda"
+        base_url = "https://mirrors.sustech.edu.cn/anaconda/miniconda"
         
         # 根据平台选择安装包
         if self.platform_info.os == OS.LINUX and self.platform_info.arch == Arch.X86_64:
@@ -120,6 +120,27 @@ class CondaInstaller(ToolInstaller):
         
         return None
     
+    def _download_installer(self, url: str, dest: str) -> bool:
+        """使用 curl 下载安装脚本
+
+        使用外部 curl 进程下载，避免 Python urllib 在 conda 环境下
+        因 SSL 库冲突导致 segfault。
+
+        Args:
+            url: 下载 URL
+            dest: 目标文件路径
+
+        Returns:
+            bool: 下载成功返回 True，否则返回 False
+        """
+        returncode, stdout, stderr = self.run_command(
+            f"curl -fsSL -o {dest} {url}",
+            shell=True,
+            timeout=300,
+            max_retries=3
+        )
+        return returncode == 0 and Path(dest).exists() and Path(dest).stat().st_size > 0
+
     def install(self) -> InstallReport:
         """安装 Conda
         
@@ -163,14 +184,9 @@ class CondaInstaller(ToolInstaller):
             ) as temp_file:
                 temp_script_path = temp_file.name
             
-            # 下载安装脚本
-            download_success = self.download_file(
-                install_url,
-                temp_script_path,
-                max_retries=3,
-                timeout=300  # Miniconda 安装包较大，需要更长的超时时间
-            )
-            
+            # 下载安装脚本（使用 curl 避免 Python SSL 库冲突）
+            download_success = self._download_installer(install_url, temp_script_path)
+
             if not download_success:
                 return InstallReport(
                     tool_name="conda",
@@ -181,8 +197,8 @@ class CondaInstaller(ToolInstaller):
             
             # 执行安装脚本
             # -b: 批量模式（不需要用户交互）
-            # -p: 指定安装路径
-            install_cmd = f"bash {temp_script_path} -b -p {self.install_dir}"
+            # -f: 强制安装（即使目录已存在也不报错）
+            install_cmd = f"bash {temp_script_path} -b -f"
             returncode, stdout, stderr = self.run_command(
                 install_cmd,
                 shell=True,
@@ -272,14 +288,9 @@ class CondaInstaller(ToolInstaller):
             ) as temp_file:
                 temp_script_path = temp_file.name
             
-            # 下载安装脚本
-            download_success = self.download_file(
-                install_url,
-                temp_script_path,
-                max_retries=3,
-                timeout=300
-            )
-            
+            # 下载安装脚本（使用 curl 避免 Python SSL 库冲突）
+            download_success = self._download_installer(install_url, temp_script_path)
+
             if not download_success:
                 return InstallReport(
                     tool_name="conda",
@@ -290,9 +301,8 @@ class CondaInstaller(ToolInstaller):
             
             # 执行升级（覆盖安装）
             # -b: 批量模式（不需要用户交互）
-            # -u: 更新模式（覆盖已有安装）
-            # -p: 指定安装路径
-            upgrade_cmd = f"bash {temp_script_path} -b -u -p {self.install_dir}"
+            # -f: 强制安装（覆盖已有安装）
+            upgrade_cmd = f"bash {temp_script_path} -b -f"
             returncode, stdout, stderr = self.run_command(
                 upgrade_cmd,
                 shell=True,

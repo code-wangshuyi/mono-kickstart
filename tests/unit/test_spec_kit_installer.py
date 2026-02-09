@@ -41,8 +41,8 @@ class TestSpecKitInstallerVerify:
     
     def test_verify_when_spec_kit_installed(self, installer):
         """测试 Spec Kit 已安装时的验证"""
-        with patch('shutil.which', return_value="/usr/local/bin/specify-cli"), \
-             patch.object(installer, 'run_command', return_value=(0, "specify-cli 1.0.0", "")):
+        with patch('shutil.which', return_value="/usr/local/bin/specify"), \
+             patch.object(installer, 'run_command', return_value=(0, "CLI Version    0.0.22", "")):
             assert installer.verify() is True
     
     def test_verify_when_spec_kit_not_in_path(self, installer):
@@ -52,7 +52,7 @@ class TestSpecKitInstallerVerify:
     
     def test_verify_when_spec_kit_command_fails(self, installer):
         """测试 Spec Kit 命令执行失败时的验证"""
-        with patch('shutil.which', return_value="/usr/local/bin/specify-cli"), \
+        with patch('shutil.which', return_value="/usr/local/bin/specify"), \
              patch.object(installer, 'run_command', return_value=(1, "", "error")):
             assert installer.verify() is False
 
@@ -62,10 +62,11 @@ class TestSpecKitInstallerGetVersion:
     
     def test_get_version_success(self, installer):
         """测试成功获取版本"""
-        with patch('shutil.which', return_value="/usr/local/bin/specify-cli"), \
-             patch.object(installer, 'run_command', return_value=(0, "1.2.3", "")):
+        mock_output = "CLI Version    0.0.22\nTemplate Version    0.0.90"
+        with patch('shutil.which', return_value="/usr/local/bin/specify"), \
+             patch.object(installer, 'run_command', return_value=(0, mock_output, "")):
             version = installer._get_installed_version()
-            assert version == "1.2.3"
+            assert version == "0.0.22"
     
     def test_get_version_when_not_installed(self, installer):
         """测试 Spec Kit 未安装时获取版本"""
@@ -75,7 +76,7 @@ class TestSpecKitInstallerGetVersion:
     
     def test_get_version_when_command_fails(self, installer):
         """测试命令失败时获取版本"""
-        with patch('shutil.which', return_value="/usr/local/bin/specify-cli"), \
+        with patch('shutil.which', return_value="/usr/local/bin/specify"), \
              patch.object(installer, 'run_command', return_value=(1, "", "error")):
             version = installer._get_installed_version()
             assert version is None

@@ -50,8 +50,8 @@ class TestClaudeCodeInstallerVerify:
         with patch('shutil.which', return_value=None):
             assert installer.verify() is False
     
-    def test_verify_when_claude_doctor_fails(self, installer):
-        """测试 claude doctor 命令执行失败时的验证"""
+    def test_verify_when_claude_version_fails(self, installer):
+        """测试 claude --version 命令执行失败时的验证"""
         with patch('shutil.which', return_value="/usr/local/bin/claude"), \
              patch.object(installer, 'run_command', return_value=(1, "", "error")):
             assert installer.verify() is False
@@ -119,7 +119,7 @@ class TestClaudeCodeInstallerInstall:
             assert report.error is not None
     
     def test_install_verification_fails(self, installer):
-        """测试安装后验证失败（claude doctor 失败）"""
+        """测试安装后验证失败（claude --version 失败）"""
         with patch.object(installer, 'verify', side_effect=[False, False]), \
              patch.object(installer, 'run_command', return_value=(0, "installed", "")):
             report = installer.install()
@@ -127,8 +127,8 @@ class TestClaudeCodeInstallerInstall:
             assert report.result == InstallResult.FAILED
             assert report.tool_name == "claude-code"
             assert "验证失败" in report.message
-            assert "claude doctor" in report.error
-    
+            assert "claude --version" in report.error
+
     def test_install_exception(self, installer):
         """测试安装过程中发生异常"""
         with patch.object(installer, 'verify', return_value=False), \
@@ -178,7 +178,7 @@ class TestClaudeCodeInstallerUpgrade:
             assert "失败" in report.message
     
     def test_upgrade_verification_fails(self, installer):
-        """测试升级后验证失败（claude doctor 失败）"""
+        """测试升级后验证失败（claude --version 失败）"""
         with patch.object(installer, 'verify', side_effect=[True, False]), \
              patch.object(installer, '_get_installed_version', return_value="1.0.0"), \
              patch.object(installer, 'run_command', return_value=(0, "upgraded", "")):
@@ -187,8 +187,8 @@ class TestClaudeCodeInstallerUpgrade:
             assert report.result == InstallResult.FAILED
             assert report.tool_name == "claude-code"
             assert "验证失败" in report.message
-            assert "claude doctor" in report.error
-    
+            assert "claude --version" in report.error
+
     def test_upgrade_exception(self, installer):
         """测试升级过程中发生异常"""
         with patch.object(installer, 'verify', return_value=True), \
@@ -206,4 +206,4 @@ class TestClaudeCodeInstallerInstallScriptUrl:
     
     def test_install_script_url(self, installer):
         """测试安装脚本 URL 正确"""
-        assert installer.install_script_url == "https://claude.ai/download/cli/install.sh"
+        assert installer.install_script_url == "https://claude.ai/install.sh"

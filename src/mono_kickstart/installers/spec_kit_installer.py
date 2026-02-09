@@ -3,6 +3,7 @@
 该模块实现 Spec Kit 的安装、升级和验证逻辑。
 """
 
+import re
 import shutil
 from pathlib import Path
 from typing import Optional
@@ -38,45 +39,50 @@ class SpecKitInstaller(ToolInstaller):
     
     def verify(self) -> bool:
         """验证 Spec Kit 是否已正确安装
-        
-        检查 specify-cli 命令是否可用，并尝试执行 specify-cli --version 命令。
-        
+
+        检查 specify 命令是否可用，并尝试执行 specify version 命令。
+
         Returns:
             bool: 如果验证成功返回 True，否则返回 False
         """
-        # 检查 specify-cli 命令是否在 PATH 中
-        if not shutil.which("specify-cli"):
+        # 检查 specify 命令是否在 PATH 中
+        if not shutil.which("specify"):
             return False
-        
-        # 尝试执行 specify-cli --version 命令
+
+        # 尝试执行 specify version 命令
         returncode, stdout, stderr = self.run_command(
-            "specify-cli --version",
+            "specify version",
             shell=True,
             timeout=10,
             max_retries=1
         )
-        
+
         return returncode == 0
     
     def _get_installed_version(self) -> Optional[str]:
         """获取已安装的 Spec Kit 版本
-        
+
+        从 specify version 输出中提取 CLI Version。
+
         Returns:
             Optional[str]: 版本号，如果无法获取则返回 None
         """
-        if not shutil.which("specify-cli"):
+        if not shutil.which("specify"):
             return None
-        
+
         returncode, stdout, stderr = self.run_command(
-            "specify-cli --version",
+            "specify version",
             shell=True,
             timeout=10,
             max_retries=1
         )
-        
+
         if returncode == 0:
-            return stdout.strip()
-        
+            # specify version 输出富文本表格，提取 "CLI Version    0.0.22"
+            match = re.search(r"CLI Version\s+(\S+)", stdout)
+            if match:
+                return match.group(1)
+
         return None
     
     def install(self) -> InstallReport:

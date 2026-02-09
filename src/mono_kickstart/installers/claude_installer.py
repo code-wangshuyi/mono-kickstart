@@ -34,28 +34,28 @@ class ClaudeCodeInstaller(ToolInstaller):
         super().__init__(platform_info, config)
         
         # Claude Code CLI 官方安装脚本 URL
-        self.install_script_url = "https://claude.ai/download/cli/install.sh"
+        self.install_script_url = "https://claude.ai/install.sh"
     
     def verify(self) -> bool:
         """验证 Claude Code CLI 是否已正确安装
-        
-        检查 claude 命令是否可用，并尝试执行 claude doctor 命令。
-        
+
+        检查 claude 命令是否可用，并尝试执行 claude --version 命令。
+
         Returns:
             bool: 如果验证成功返回 True，否则返回 False
         """
         # 检查 claude 命令是否在 PATH 中
         if not shutil.which("claude"):
             return False
-        
-        # 尝试执行 claude doctor 命令进行验证
+
+        # 尝试执行 claude --version 命令进行验证
         returncode, stdout, stderr = self.run_command(
-            "claude doctor",
+            "claude --version",
             shell=True,
             timeout=30,
             max_retries=1
         )
-        
+
         return returncode == 0
     
     def _get_installed_version(self) -> Optional[str]:
@@ -85,7 +85,7 @@ class ClaudeCodeInstaller(ToolInstaller):
         执行以下步骤：
         1. 检查 Claude Code CLI 是否已安装
         2. 执行官方安装脚本（stable 渠道）
-        3. 使用 claude doctor 验证安装
+        3. 使用 claude --version 验证安装
         
         Returns:
             InstallReport: 安装报告
@@ -103,14 +103,14 @@ class ClaudeCodeInstaller(ToolInstaller):
         try:
             # 执行官方安装脚本
             # curl -fsSL https://claude.ai/download/cli/install.sh | sh
-            install_cmd = f"curl -fsSL {self.install_script_url} | sh"
+            install_cmd = f"curl -fsSL {self.install_script_url} | bash"
             returncode, stdout, stderr = self.run_command(
                 install_cmd,
                 shell=True,
                 timeout=300,
                 max_retries=2
             )
-            
+
             if returncode != 0:
                 return InstallReport(
                     tool_name="claude-code",
@@ -118,14 +118,14 @@ class ClaudeCodeInstaller(ToolInstaller):
                     message="执行 Claude Code CLI 安装脚本失败",
                     error=stderr or "安装脚本返回非零退出码"
                 )
-            
-            # 验证安装（使用 claude doctor）
+
+            # 验证安装（使用 claude --version）
             if not self.verify():
                 return InstallReport(
                     tool_name="claude-code",
                     result=InstallResult.FAILED,
                     message="Claude Code CLI 安装验证失败",
-                    error="安装脚本执行成功，但 claude doctor 验证失败"
+                    error="安装脚本执行成功，但 claude --version 验证失败"
                 )
             
             # 获取安装的版本
@@ -168,7 +168,7 @@ class ClaudeCodeInstaller(ToolInstaller):
             old_version = self._get_installed_version()
             
             # 执行官方安装脚本（会自动升级）
-            install_cmd = f"curl -fsSL {self.install_script_url} | sh"
+            install_cmd = f"curl -fsSL {self.install_script_url} | bash"
             returncode, stdout, stderr = self.run_command(
                 install_cmd,
                 shell=True,
@@ -184,13 +184,13 @@ class ClaudeCodeInstaller(ToolInstaller):
                     error=stderr or "升级脚本返回非零退出码"
                 )
             
-            # 验证升级（使用 claude doctor）
+            # 验证升级（使用 claude --version）
             if not self.verify():
                 return InstallReport(
                     tool_name="claude-code",
                     result=InstallResult.FAILED,
                     message="Claude Code CLI 升级验证失败",
-                    error="升级脚本执行成功，但 claude doctor 验证失败"
+                    error="升级脚本执行成功，但 claude --version 验证失败"
                 )
             
             # 获取升级后的版本

@@ -81,7 +81,7 @@ class TestCondaInstaller:
         url = installer.get_install_url()
         
         assert "Miniconda3-latest-MacOSX-arm64.sh" in url
-        assert url.startswith("https://repo.anaconda.com/miniconda")
+        assert url.startswith("https://mirrors.sustech.edu.cn/anaconda/miniconda")
     
     def test_get_install_url_macos_x86(self, platform_info_macos_x86, tool_config):
         """测试 macOS x86_64 平台的安装包 URL"""
@@ -89,7 +89,7 @@ class TestCondaInstaller:
         url = installer.get_install_url()
         
         assert "Miniconda3-latest-MacOSX-x86_64.sh" in url
-        assert url.startswith("https://repo.anaconda.com/miniconda")
+        assert url.startswith("https://mirrors.sustech.edu.cn/anaconda/miniconda")
     
     def test_get_install_url_linux_x86(self, platform_info_linux_x86, tool_config):
         """测试 Linux x86_64 平台的安装包 URL"""
@@ -97,7 +97,7 @@ class TestCondaInstaller:
         url = installer.get_install_url()
         
         assert "Miniconda3-latest-Linux-x86_64.sh" in url
-        assert url.startswith("https://repo.anaconda.com/miniconda")
+        assert url.startswith("https://mirrors.sustech.edu.cn/anaconda/miniconda")
     
     def test_get_install_url_unsupported_platform(self, platform_info_unsupported, tool_config):
         """测试不支持的平台抛出异常"""
@@ -234,7 +234,7 @@ class TestCondaInstaller:
         installer = CondaInstaller(platform_info_macos_arm64, tool_config)
         
         with patch.object(installer, 'verify', return_value=False):
-            with patch.object(installer, 'download_file', return_value=False):
+            with patch.object(installer, '_download_installer', return_value=False):
                 report = installer.install()
                 
                 assert report.result == InstallResult.FAILED
@@ -247,7 +247,7 @@ class TestCondaInstaller:
         installer = CondaInstaller(platform_info_macos_arm64, tool_config)
         
         with patch.object(installer, 'verify', return_value=False):
-            with patch.object(installer, 'download_file', return_value=True):
+            with patch.object(installer, '_download_installer', return_value=True):
                 with patch.object(
                     installer,
                     'run_command',
@@ -272,7 +272,7 @@ class TestCondaInstaller:
             'verify',
             side_effect=verify_calls
         ):
-            with patch.object(installer, 'download_file', return_value=True):
+            with patch.object(installer, '_download_installer', return_value=True):
                 with patch.object(
                     installer,
                     'run_command',
@@ -296,7 +296,7 @@ class TestCondaInstaller:
             'verify',
             side_effect=verify_calls
         ):
-            with patch.object(installer, 'download_file', return_value=True):
+            with patch.object(installer, '_download_installer', return_value=True):
                 with patch.object(
                     installer,
                     'run_command',
@@ -322,7 +322,7 @@ class TestCondaInstaller:
         verify_calls = [False, True]
         
         with patch.object(installer, 'verify', side_effect=verify_calls):
-            with patch.object(installer, 'download_file', return_value=True):
+            with patch.object(installer, '_download_installer', return_value=True):
                 with patch.object(installer, 'run_command') as mock_run:
                     mock_run.return_value = (0, "installed", "")
                     
@@ -338,10 +338,9 @@ class TestCondaInstaller:
                             assert mock_run.called
                             call_args = mock_run.call_args[0][0]
                             assert "-b" in call_args  # 批量模式
-                            assert "-p" in call_args  # 指定路径
-                            assert str(installer.install_dir) in call_args
+                            assert "-f" in call_args  # 强制安装
                             assert report.result == InstallResult.SUCCESS
-    
+
     def test_install_exception_handling(self, platform_info_macos_arm64, tool_config):
         """测试安装过程中异常处理"""
         installer = CondaInstaller(platform_info_macos_arm64, tool_config)
@@ -349,7 +348,7 @@ class TestCondaInstaller:
         with patch.object(installer, 'verify', return_value=False):
             with patch.object(
                 installer,
-                'download_file',
+                '_download_installer',
                 side_effect=Exception("Unexpected error")
             ):
                 report = installer.install()
@@ -366,7 +365,7 @@ class TestCondaInstaller:
         verify_calls = [False, True]
         
         with patch.object(installer, 'verify', side_effect=verify_calls):
-            with patch.object(installer, 'download_file', return_value=True):
+            with patch.object(installer, '_download_installer', return_value=True):
                 with patch.object(
                     installer,
                     'run_command',
@@ -389,7 +388,7 @@ class TestCondaInstaller:
         installer = CondaInstaller(platform_info_macos_arm64, tool_config)
         
         with patch.object(installer, 'verify', return_value=False):
-            with patch.object(installer, 'download_file', return_value=True):
+            with patch.object(installer, '_download_installer', return_value=True):
                 with patch.object(
                     installer,
                     'run_command',
@@ -439,7 +438,7 @@ class TestCondaInstaller:
                 '_get_installed_version',
                 return_value="22.0.0"
             ):
-                with patch.object(installer, 'download_file', return_value=False):
+                with patch.object(installer, '_download_installer', return_value=False):
                     report = installer.upgrade()
                     
                     assert report.result == InstallResult.FAILED
@@ -456,7 +455,7 @@ class TestCondaInstaller:
                 '_get_installed_version',
                 return_value="22.0.0"
             ):
-                with patch.object(installer, 'download_file', return_value=True):
+                with patch.object(installer, '_download_installer', return_value=True):
                     with patch.object(
                         installer,
                         'run_command',
@@ -485,7 +484,7 @@ class TestCondaInstaller:
                 '_get_installed_version',
                 return_value="22.0.0"
             ):
-                with patch.object(installer, 'download_file', return_value=True):
+                with patch.object(installer, '_download_installer', return_value=True):
                     with patch.object(
                         installer,
                         'run_command',
@@ -515,7 +514,7 @@ class TestCondaInstaller:
                 '_get_installed_version',
                 side_effect=version_calls
             ):
-                with patch.object(installer, 'download_file', return_value=True):
+                with patch.object(installer, '_download_installer', return_value=True):
                     with patch.object(
                         installer,
                         'run_command',
@@ -544,7 +543,7 @@ class TestCondaInstaller:
                 '_get_installed_version',
                 side_effect=version_calls
             ):
-                with patch.object(installer, 'download_file', return_value=True):
+                with patch.object(installer, '_download_installer', return_value=True):
                     with patch.object(installer, 'run_command') as mock_run:
                         mock_run.return_value = (0, "upgraded", "")
                         
@@ -555,9 +554,7 @@ class TestCondaInstaller:
                             assert mock_run.called
                             call_args = mock_run.call_args[0][0]
                             assert "-b" in call_args  # 批量模式
-                            assert "-u" in call_args  # 更新模式
-                            assert "-p" in call_args  # 指定路径
-                            assert str(installer.install_dir) in call_args
+                            assert "-f" in call_args  # 强制安装
                             assert report.result == InstallResult.SUCCESS
     
     def test_upgrade_exception_handling(self, platform_info_macos_arm64, tool_config):
@@ -590,7 +587,7 @@ class TestCondaInstaller:
                 '_get_installed_version',
                 side_effect=version_calls
             ):
-                with patch.object(installer, 'download_file', return_value=True):
+                with patch.object(installer, '_download_installer', return_value=True):
                     with patch.object(
                         installer,
                         'run_command',
@@ -613,7 +610,7 @@ class TestCondaInstaller:
                 '_get_installed_version',
                 return_value="22.0.0"
             ):
-                with patch.object(installer, 'download_file', return_value=True):
+                with patch.object(installer, '_download_installer', return_value=True):
                     with patch.object(
                         installer,
                         'run_command',

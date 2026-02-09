@@ -133,7 +133,7 @@ class CodexInstaller(ToolInstaller):
                         error="请先安装 Bun 或使用 npm 安装"
                     )
                 
-                install_cmd = "bun install -g @openai/codex-cli"
+                install_cmd = "bun install -g @openai/codex"
             else:  # npm
                 # 检查 npm 是否可用
                 if not shutil.which("npm"):
@@ -144,7 +144,7 @@ class CodexInstaller(ToolInstaller):
                         error="请先安装 Node.js 和 npm"
                     )
                 
-                install_cmd = "npm install -g @openai/codex-cli"
+                install_cmd = "npm i -g @openai/codex"
             
             # 执行安装命令
             returncode, stdout, stderr = self.run_command(
@@ -221,7 +221,7 @@ class CodexInstaller(ToolInstaller):
                         error="请先安装 Bun 或使用 npm 升级"
                     )
                 
-                upgrade_cmd = "bun update -g @openai/codex-cli"
+                upgrade_cmd = "bun update -g @openai/codex"
             else:  # npm
                 # 检查 npm 是否可用
                 if not shutil.which("npm"):
@@ -232,7 +232,7 @@ class CodexInstaller(ToolInstaller):
                         error="请先安装 Node.js 和 npm"
                     )
                 
-                upgrade_cmd = "npm update -g @openai/codex-cli"
+                upgrade_cmd = "npm update -g @openai/codex"
             
             # 执行升级命令
             returncode, stdout, stderr = self.run_command(

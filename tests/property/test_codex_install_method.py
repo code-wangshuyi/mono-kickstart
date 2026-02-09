@@ -136,13 +136,13 @@ def test_codex_install_command_matches_method(platform_info, bun_installed):
             # 应该调用 bun install -g
             assert mock_run_command.called
             call_args = mock_run_command.call_args[0][0]
-            assert "bun install -g @openai/codex-cli" in call_args, \
+            assert "bun install -g @openai/codex" in call_args, \
                 f"Bun 已安装，应使用 'bun install -g' 命令，实际命令: {call_args}"
         else:
             # 应该调用 npm install -g
             assert mock_run_command.called
             call_args = mock_run_command.call_args[0][0]
-            assert "npm install -g @openai/codex-cli" in call_args, \
+            assert "npm i -g @openai/codex" in call_args, \
                 f"Bun 未安装，应使用 'npm install -g' 命令，实际命令: {call_args}"
 
 
@@ -197,11 +197,11 @@ def test_codex_upgrade_command_matches_method(platform_info, bun_installed):
             # 应该调用 bun update -g
             assert mock_run_command.called
             call_args = mock_run_command.call_args[0][0]
-            assert "bun update -g @openai/codex-cli" in call_args, \
+            assert "bun update -g @openai/codex" in call_args, \
                 f"Bun 已安装，应使用 'bun update -g' 命令，实际命令: {call_args}"
         else:
             # 应该调用 npm update -g
             assert mock_run_command.called
             call_args = mock_run_command.call_args[0][0]
-            assert "npm update -g @openai/codex-cli" in call_args, \
+            assert "npm update -g @openai/codex" in call_args, \
                 f"Bun 未安装，应使用 'npm update -g' 命令，实际命令: {call_args}"
