@@ -279,7 +279,7 @@ class ToolDetector:
         if not self.is_command_available("specify"):
             return ToolStatus(name="spec-kit", installed=False)
         
-        version = self.get_command_version("specify", "--version")
+        version = self.get_command_version("specify", "version")
         path = shutil.which("specify")
         
         return ToolStatus(
@@ -310,6 +310,48 @@ class ToolDetector:
             path=path
         )
     
+    def detect_pip(self) -> ToolStatus:
+        """检测 pip
+
+        检查 pip3 或 pip 是否可用。
+
+        Returns:
+            ToolStatus: pip 的状态信息
+        """
+        # 优先检查 pip3
+        cmd = None
+        if self.is_command_available("pip3"):
+            cmd = "pip3"
+        elif self.is_command_available("pip"):
+            cmd = "pip"
+
+        if cmd is None:
+            return ToolStatus(name="pip", installed=False)
+
+        version = self.get_command_version(cmd, "--version")
+        path = shutil.which(cmd)
+
+        return ToolStatus(
+            name="pip",
+            installed=True,
+            version=version,
+            path=path
+        )
+
+    def detect_mirror_tools(self) -> Dict[str, ToolStatus]:
+        """检测支持镜像配置的工具
+
+        Returns:
+            Dict[str, ToolStatus]: 工具名称到状态的映射
+        """
+        return {
+            "npm": self.detect_node(),  # npm 随 node 一起安装
+            "bun": self.detect_bun(),
+            "pip": self.detect_pip(),
+            "uv": self.detect_uv(),
+            "conda": self.detect_conda(),
+        }
+
     def detect_all_tools(self) -> Dict[str, ToolStatus]:
         """检测所有工具
         

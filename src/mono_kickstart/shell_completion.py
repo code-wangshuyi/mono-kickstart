@@ -18,7 +18,7 @@ _mk_completion() {
     prev="${COMP_WORDS[COMP_CWORD-1]}"
     
     # 主命令
-    local commands="init upgrade install set-default setup-shell"
+    local commands="init upgrade install set-default setup-shell status download config"
 
     # 工具列表
     local tools="nvm node conda bun uv claude-code codex npx spec-kit bmad-method"
@@ -51,9 +51,33 @@ _mk_completion() {
                 COMPREPLY=( $(compgen -W "${default_tools}" -- ${cur}) )
             fi
             ;;
-        setup-shell)
+        setup-shell|status)
             local opts="--help"
             COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
+            ;;
+        download)
+            if [[ ${cur} == -* ]]; then
+                local opts="-o --output --dry-run --help"
+                COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
+            else
+                local download_tools="conda"
+                COMPREPLY=( $(compgen -W "${download_tools}" -- ${cur}) )
+            fi
+            ;;
+        config)
+            if [ $COMP_CWORD -eq 2 ]; then
+                COMPREPLY=( $(compgen -W "mirror" -- ${cur}) )
+            elif [ $COMP_CWORD -eq 3 ] && [ "${COMP_WORDS[2]}" = "mirror" ]; then
+                COMPREPLY=( $(compgen -W "show reset set" -- ${cur}) )
+            elif [ "${COMP_WORDS[2]}" = "mirror" ] && [ "${COMP_WORDS[3]}" = "set" ]; then
+                if [ $COMP_CWORD -eq 4 ]; then
+                    COMPREPLY=( $(compgen -W "china default npm bun pip uv conda" -- ${cur}) )
+                fi
+            elif [ "${COMP_WORDS[2]}" = "mirror" ] && [ "${COMP_WORDS[3]}" = "reset" ]; then
+                if [[ ${cur} == -* ]]; then
+                    COMPREPLY=( $(compgen -W "--tool" -- ${cur}) )
+                fi
+            fi
             ;;
     esac
 }
@@ -74,6 +98,9 @@ _mk() {
         'install:安装开发工具'
         'set-default:设置工具的默认版本'
         'setup-shell:配置 shell（PATH 和 Tab 补全）'
+        'status:查看已安装工具的状态和版本'
+        'config:管理配置（镜像源等）'
+        'download:下载工具安装包到本地（不安装）'
     )
 
     tools=(
@@ -115,20 +142,74 @@ _mk() {
                     ;;
                 upgrade|install)
                     _arguments \
-                        '1: :_describe "tool" tools' \
+                        '1:tool:(nvm node conda bun uv claude-code codex npx spec-kit bmad-method)' \
                         '--all[所有工具]' \
                         '--dry-run[模拟运行]' \
                         '--help[显示帮助信息]'
                     ;;
                 set-default)
                     _arguments \
-                        '1: :_describe "tool" default_tools' \
+                        '1:tool:(node)' \
                         '2:version:' \
                         '--help[显示帮助信息]'
                     ;;
-                setup-shell)
+                setup-shell|status)
                     _arguments \
                         '--help[显示帮助信息]'
+                    ;;
+                download)
+                    _arguments \
+                        '1:tool:(conda)' \
+                        '-o[下载文件保存目录]:dir:_directories' \
+                        '--output[下载文件保存目录]:dir:_directories' \
+                        '--dry-run[模拟运行，不实际下载]' \
+                        '--help[显示帮助信息]'
+                    ;;
+                config)
+                    local -a config_actions mirror_actions mirror_tools
+                    config_actions=(
+                        'mirror:配置镜像源'
+                    )
+                    mirror_actions=(
+                        'show:显示当前镜像源配置'
+                        'reset:重置镜像源为上游默认值'
+                        'set:设置指定工具的镜像源 URL'
+                    )
+                    _arguments -C \
+                        '1: :->config_action' \
+                        '*:: :->config_args'
+                    case $state in
+                        config_action)
+                            _describe 'config action' config_actions
+                            ;;
+                        config_args)
+                            case $words[1] in
+                                mirror)
+                                    _arguments -C \
+                                        '1: :->mirror_action' \
+                                        '*:: :->mirror_args'
+                                    case $state in
+                                        mirror_action)
+                                            _describe 'mirror action' mirror_actions
+                                            ;;
+                                        mirror_args)
+                                            case $words[1] in
+                                                set)
+                                                    _arguments \
+                                                        '1:tool:(china default npm bun pip uv conda)' \
+                                                        '2:url:'
+                                                    ;;
+                                                reset)
+                                                    _arguments \
+                                                        '--tool[指定工具]:tool:(npm bun pip uv conda)'
+                                                    ;;
+                                            esac
+                                            ;;
+                                    esac
+                                    ;;
+                            esac
+                            ;;
+                    esac
                     ;;
             esac
             ;;
@@ -148,6 +229,9 @@ complete -c mk -f -n "__fish_use_subcommand" -a "upgrade" -d "升级已安装的
 complete -c mk -f -n "__fish_use_subcommand" -a "install" -d "安装开发工具"
 complete -c mk -f -n "__fish_use_subcommand" -a "set-default" -d "设置工具的默认版本"
 complete -c mk -f -n "__fish_use_subcommand" -a "setup-shell" -d "配置 shell（PATH 和 Tab 补全）"
+complete -c mk -f -n "__fish_use_subcommand" -a "status" -d "查看已安装工具的状态和版本"
+complete -c mk -f -n "__fish_use_subcommand" -a "download" -d "下载工具安装包到本地（不安装）"
+complete -c mk -f -n "__fish_use_subcommand" -a "config" -d "管理配置（镜像源等）"
 
 # init 命令选项
 complete -c mk -f -n "__fish_seen_subcommand_from init" -l config -d "配置文件路径"
@@ -164,8 +248,29 @@ complete -c mk -f -n "__fish_seen_subcommand_from upgrade install" -a "$tools"
 complete -c mk -f -n "__fish_seen_subcommand_from upgrade install" -l all -d "所有工具"
 complete -c mk -f -n "__fish_seen_subcommand_from upgrade install" -l dry-run -d "模拟运行"
 
+# download 命令
+complete -c mk -f -n "__fish_seen_subcommand_from download" -a "conda" -d "Conda (Miniconda)"
+complete -c mk -f -n "__fish_seen_subcommand_from download" -s o -l output -d "下载文件保存目录"
+complete -c mk -f -n "__fish_seen_subcommand_from download" -l dry-run -d "模拟运行，不实际下载"
+
 # set-default 命令的工具名称
 complete -c mk -f -n "__fish_seen_subcommand_from set-default" -a "node" -d "Node.js 运行时"
+
+# config 子命令
+complete -c mk -f -n "__fish_seen_subcommand_from config; and not __fish_seen_subcommand_from mirror" -a "mirror" -d "配置镜像源"
+
+# config mirror 子操作
+complete -c mk -f -n "__fish_seen_subcommand_from mirror; and not __fish_seen_subcommand_from show reset set" -a "show" -d "显示当前镜像源配置"
+complete -c mk -f -n "__fish_seen_subcommand_from mirror; and not __fish_seen_subcommand_from show reset set" -a "reset" -d "重置镜像源为上游默认值"
+complete -c mk -f -n "__fish_seen_subcommand_from mirror; and not __fish_seen_subcommand_from show reset set" -a "set" -d "设置指定工具的镜像源 URL"
+
+# config mirror set 工具名称和预设
+complete -c mk -f -n "__fish_seen_subcommand_from set" -a "china" -d "国内镜像预设"
+complete -c mk -f -n "__fish_seen_subcommand_from set" -a "default" -d "上游默认预设"
+complete -c mk -f -n "__fish_seen_subcommand_from set" -a "npm bun pip uv conda"
+
+# config mirror reset --tool
+complete -c mk -f -n "__fish_seen_subcommand_from reset" -l tool -d "指定工具" -a "npm bun pip uv conda"
 
 # mono-kickstart 别名（与 mk 相同的补全）
 complete -c mono-kickstart -w mk

@@ -199,6 +199,8 @@ class InstallOrchestrator:
                 "npm": True,
                 "bun": True,
                 "uv": True,
+                "pip": True,
+                "conda": True,
             }
         
         return self.mirror_configurator.configure_all()
@@ -274,7 +276,24 @@ class InstallOrchestrator:
                 result=InstallResult.SUCCESS if uv_result else InstallResult.FAILED,
                 message="uv 镜像源配置成功" if uv_result else "uv 镜像源配置失败"
             )
-        
+
+            # pip 镜像配置（pip 通常随 Python/uv 一起可用）
+            pip_result = self.mirror_configurator.configure_pip_mirror()
+            tool_reports["pip-mirror"] = InstallReport(
+                tool_name="pip-mirror",
+                result=InstallResult.SUCCESS if pip_result else InstallResult.FAILED,
+                message="pip 镜像源配置成功" if pip_result else "pip 镜像源配置失败"
+            )
+
+        # 检查 conda 是否安装成功
+        if "conda" in tool_reports and tool_reports["conda"].result == InstallResult.SUCCESS:
+            conda_result = self.mirror_configurator.configure_conda_mirror()
+            tool_reports["conda-mirror"] = InstallReport(
+                tool_name="conda-mirror",
+                result=InstallResult.SUCCESS if conda_result else InstallResult.FAILED,
+                message="Conda 镜像源配置成功" if conda_result else "Conda 镜像源配置失败"
+            )
+
         # 3. 创建项目结构
         if not self.dry_run:
             project_success, project_error = self.create_project(project_name, force)

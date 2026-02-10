@@ -28,17 +28,19 @@ class ToolConfig:
 @dataclass
 class RegistryConfig:
     """镜像源配置
-    
+
     Attributes:
         npm: npm 镜像源地址
         bun: Bun 镜像源地址
         pypi: PyPI 镜像源地址
         python_install: Python 安装包下载代理地址
+        conda: Conda 镜像源基础地址
     """
     npm: str = "https://registry.npmmirror.com/"
     bun: str = "https://registry.npmmirror.com/"
     pypi: str = "https://mirrors.sustech.edu.cn/pypi/web/simple"
     python_install: str = "https://ghfast.top/https://github.com/astral-sh/python-build-standalone/releases/download"
+    conda: str = "https://mirrors.sustech.edu.cn/anaconda"
 
 
 @dataclass
@@ -177,6 +179,8 @@ class ConfigManager:
                 result.registry.pypi = config.registry.pypi
             if config.registry.python_install != RegistryConfig().python_install:
                 result.registry.python_install = config.registry.python_install
+            if config.registry.conda != RegistryConfig().conda:
+                result.registry.conda = config.registry.conda
         
         return result
     
@@ -271,7 +275,7 @@ class ConfigManager:
         
         # 验证镜像源 URL 格式（简单检查）
         registry = config.registry
-        for field_name in ["npm", "bun", "pypi", "python_install"]:
+        for field_name in ["npm", "bun", "pypi", "python_install", "conda"]:
             url = getattr(registry, field_name)
             if not url or not isinstance(url, str):
                 errors.append(f"镜像源 {field_name} 的 URL 无效")

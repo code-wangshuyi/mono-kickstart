@@ -62,6 +62,16 @@ class TestRegistryConfig:
         assert config.pypi == "https://custom-pypi.com/"
         assert config.python_install == "https://custom-python.com/"
 
+    def test_default_conda_value(self):
+        """测试 conda 默认值"""
+        config = RegistryConfig()
+        assert config.conda == "https://mirrors.sustech.edu.cn/anaconda"
+
+    def test_custom_conda_value(self):
+        """测试自定义 conda 值"""
+        config = RegistryConfig(conda="https://custom-conda.com/")
+        assert config.conda == "https://custom-conda.com/"
+
 
 class TestProjectConfig:
     """测试 ProjectConfig 数据类"""
@@ -431,12 +441,40 @@ class TestConfigManager:
         config = Config(
             registry=RegistryConfig(npm="")
         )
-        
+
         manager = ConfigManager()
         errors = manager.validate(config)
-        
+
         assert len(errors) > 0
         assert "npm" in errors[0]
+
+    def test_merge_configs_conda_override(self):
+        """测试 conda 字段合并覆盖"""
+        config1 = Config(
+            registry=RegistryConfig(conda="https://conda1.com/")
+        )
+
+        config2 = Config(
+            registry=RegistryConfig(conda="https://conda2.com/")
+        )
+
+        manager = ConfigManager()
+        result = manager.merge_configs(config1, config2)
+
+        # 后面的配置覆盖前面的
+        assert result.registry.conda == "https://conda2.com/"
+
+    def test_validate_conda_url(self):
+        """测试验证 conda URL"""
+        config = Config(
+            registry=RegistryConfig(conda="")
+        )
+
+        manager = ConfigManager()
+        errors = manager.validate(config)
+
+        assert len(errors) > 0
+        assert "conda" in errors[0]
     
     def test_roundtrip_consistency(self, tmp_path):
         """测试配置保存和加载的往返一致性"""

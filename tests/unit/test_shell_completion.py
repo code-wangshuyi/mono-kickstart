@@ -90,7 +90,8 @@ class TestCompletionScriptContent:
         assert "upgrade" in BASH_COMPLETION_SCRIPT
         assert "install" in BASH_COMPLETION_SCRIPT
         assert "setup-shell" in BASH_COMPLETION_SCRIPT
-    
+        assert "status" in BASH_COMPLETION_SCRIPT
+
     def test_bash_script_has_all_tools(self):
         """Test bash script includes all tools"""
         tools = ["nvm", "node", "conda", "bun", "uv", "claude-code", "codex", "spec-kit", "bmad-method"]
@@ -103,7 +104,8 @@ class TestCompletionScriptContent:
         assert "upgrade" in ZSH_COMPLETION_SCRIPT
         assert "install" in ZSH_COMPLETION_SCRIPT
         assert "setup-shell" in ZSH_COMPLETION_SCRIPT
-    
+        assert "status" in ZSH_COMPLETION_SCRIPT
+
     def test_zsh_script_has_all_tools(self):
         """Test zsh script includes all tools"""
         tools = ["nvm", "node", "conda", "bun", "uv", "claude-code", "codex", "spec-kit", "bmad-method"]
@@ -116,7 +118,8 @@ class TestCompletionScriptContent:
         assert "upgrade" in FISH_COMPLETION_SCRIPT
         assert "install" in FISH_COMPLETION_SCRIPT
         assert "setup-shell" in FISH_COMPLETION_SCRIPT
-    
+        assert "status" in FISH_COMPLETION_SCRIPT
+
     def test_fish_script_has_all_tools(self):
         """Test fish script includes all tools"""
         tools = ["nvm", "node", "conda", "bun", "uv", "claude-code", "codex", "spec-kit", "bmad-method"]

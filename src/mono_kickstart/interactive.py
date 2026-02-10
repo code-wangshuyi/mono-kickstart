@@ -212,14 +212,16 @@ class InteractiveConfigurator:
                 npm="https://registry.npmmirror.com/",
                 bun="https://registry.npmmirror.com/",
                 pypi="https://mirrors.sustech.edu.cn/pypi/web/simple",
-                python_install="https://ghfast.top/https://github.com/astral-sh/python-build-standalone/releases/download"
+                python_install="https://ghfast.top/https://github.com/astral-sh/python-build-standalone/releases/download",
+                conda="https://mirrors.sustech.edu.cn/anaconda"
             )
         else:
             config.registry = RegistryConfig(
                 npm="https://registry.npmjs.org/",
                 bun="https://registry.npmjs.org/",
                 pypi="https://pypi.org/simple",
-                python_install="https://github.com/astral-sh/python-build-standalone/releases/download"
+                python_install="https://github.com/astral-sh/python-build-standalone/releases/download",
+                conda="https://repo.anaconda.com"
             )
         
         return config
