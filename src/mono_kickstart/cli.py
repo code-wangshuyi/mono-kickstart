@@ -6,8 +6,10 @@ CLI 入口模块
 
 import argparse
 import hashlib
+import json
 import logging
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -43,6 +45,48 @@ AVAILABLE_TOOLS = [
 DOWNLOADABLE_TOOLS = [
     "conda",
 ]
+
+# MCP 服务器配置注册表
+MCP_SERVERS = ["chrome", "context7"]
+
+# --allow 可选值
+ALLOW_CHOICES = ["all"]
+
+# --allow all 对应的完整权限列表
+ALLOW_ALL_PERMISSIONS = [
+    "Read", "Write", "Edit", "Bash", "Glob", "Grep",
+    "WebFetch", "WebSearch", "Task", "NotebookEdit",
+    "TodoWrite", "AskUserQuestion", "ListDir", "MultiEdit",
+]
+
+# --mode 可选值
+MODE_CHOICES = ["plan"]
+
+MCP_SERVER_CONFIGS = {
+    "chrome": {
+        "name": "chrome-devtools",
+        "display_name": "Chrome DevTools",
+        "config": {
+            "command": "npx",
+            "args": [
+                "chrome-devtools-mcp@latest"
+            ]
+        },
+        "claude_mcp_add_cmd": "claude mcp add chrome-devtools --scope user npx chrome-devtools-mcp@latest",
+    },
+    "context7": {
+        "name": "context7",
+        "display_name": "Context7",
+        "config": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "@upstash/context7-mcp@latest"
+            ]
+        },
+        "claude_mcp_add_cmd": "claude mcp add context7 -- npx -y @upstash/context7-mcp@latest",
+    },
+}
 
 
 class ChineseHelpFormatter(argparse.RawDescriptionHelpFormatter):
@@ -298,6 +342,96 @@ def create_parser() -> argparse.ArgumentParser:
         default=None,
         metavar='URL',
         help='镜像源 URL（使用预设时无需指定）'
+    )
+
+    # dd 子命令 (driven development)
+    dd_parser = subparsers.add_parser(
+        'dd',
+        help='配置驱动开发工具（Spec-Kit、BMad Method）',
+        description='为当前项目配置驱动开发工具\n\n'
+                    '支持 Spec-Kit（规格驱动开发）和 BMad Method（AI 敏捷开发框架）。\n'
+                    '至少需要指定一个工具标志（--spec-kit 或 --bmad-method）。',
+        formatter_class=ChineseHelpFormatter,
+        epilog='示例:\n'
+               '  mk dd --spec-kit                使用 Claude 初始化 Spec-Kit（默认）\n'
+               '  mk dd --spec-kit --codex        使用 Codex 初始化 Spec-Kit\n'
+               '  mk dd --bmad-method             安装 BMad Method\n'
+               '  mk dd --spec-kit --bmad-method  同时初始化两个工具\n'
+               '  mk dd --spec-kit --force        强制重新初始化 Spec-Kit',
+    )
+    dd_parser.add_argument(
+        '-s', '--spec-kit',
+        action='store_true',
+        help='初始化 Spec-Kit 规格驱动开发工具'
+    )
+    dd_parser.add_argument(
+        '-b', '--bmad-method',
+        action='store_true',
+        help='安装 BMad Method 敏捷开发框架'
+    )
+    dd_ai_group = dd_parser.add_mutually_exclusive_group()
+    dd_ai_group.add_argument(
+        '-c', '--claude',
+        action='store_true',
+        help='使用 Claude 作为 AI 后端（默认）'
+    )
+    dd_ai_group.add_argument(
+        '-x', '--codex',
+        action='store_true',
+        help='使用 Codex 作为 AI 后端'
+    )
+    dd_parser.add_argument(
+        '-f', '--force',
+        action='store_true',
+        help='强制重新初始化（覆盖已有配置）'
+    )
+    dd_parser.add_argument(
+        '--dry-run',
+        action='store_true',
+        help='模拟运行，不实际执行'
+    )
+
+    # claude 子命令
+    claude_parser = subparsers.add_parser(
+        'claude',
+        help='配置 Claude Code 项目设置（MCP 服务器等）',
+        description='为当前项目配置 Claude Code 设置\n\n'
+                    '支持配置 MCP (Model Context Protocol) 服务器和权限，\n'
+                    '将配置写入当前目录的 .claude/settings.local.json。',
+        formatter_class=ChineseHelpFormatter,
+        epilog='示例:\n'
+               '  mk claude --mcp chrome               添加 Chrome DevTools MCP 服务器\n'
+               '  mk claude --allow all                允许所有命令\n'
+               '  mk claude --mode plan                默认以 plan 模式运行\n'
+               '  mk claude --allow all --mode plan    同时配置权限和模式\n'
+               '  mk claude --allow all --mcp chrome   同时配置权限和 MCP\n'
+               '  mk claude --allow all --dry-run      模拟运行，查看将写入的配置',
+    )
+    claude_parser.add_argument(
+        '--mcp',
+        type=str,
+        choices=MCP_SERVERS,
+        metavar='SERVER',
+        help=f'添加 MCP 服务器配置 (可选值: {", ".join(MCP_SERVERS)})'
+    )
+    claude_parser.add_argument(
+        '--allow',
+        type=str,
+        choices=ALLOW_CHOICES,
+        metavar='SCOPE',
+        help=f'配置权限允许所有命令 (可选值: {", ".join(ALLOW_CHOICES)})'
+    )
+    claude_parser.add_argument(
+        '--mode',
+        type=str,
+        choices=MODE_CHOICES,
+        metavar='MODE',
+        help=f'设置权限模式 (可选值: {", ".join(MODE_CHOICES)})'
+    )
+    claude_parser.add_argument(
+        '--dry-run',
+        action='store_true',
+        help='模拟运行，不实际写入配置'
     )
 
     return parser
@@ -1247,6 +1381,445 @@ def _apply_mirror_preset(configurator, preset_name: str) -> int:
     return 0
 
 
+def _dd_spec_kit(ai_backend: str, force: bool, dry_run: bool) -> tuple:
+    """Spec-Kit 初始化处理
+
+    Args:
+        ai_backend: AI 后端名称 (claude/codex)
+        force: 是否强制重新初始化
+        dry_run: 是否模拟运行
+
+    Returns:
+        (success: bool, message: str) 元组
+    """
+    logger.info("📋 [Spec-Kit] 检查环境...")
+
+    # 检查 specify 命令是否可用
+    if not shutil.which("specify"):
+        logger.error("❌ 错误: Spec-Kit (specify) 未安装")
+        logger.info("💡 提示: 请先运行 'mk install spec-kit' 安装 Spec-Kit")
+        return (False, "specify 未安装")
+
+    # 执行 specify check
+    result = subprocess.run(
+        "specify check",
+        shell=True,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    if result.returncode != 0:
+        logger.error("❌ 错误: Spec-Kit 环境检查失败")
+        if result.stderr:
+            logger.error(f"  {result.stderr.strip()}")
+        logger.info("💡 提示: 请检查 AI 编程代理是否已安装（如 Claude Code 或 Codex）")
+        return (False, "环境检查失败")
+
+    logger.info("✓ Spec-Kit 环境检查通过")
+    logger.info("")
+
+    # 构造 specify init 命令
+    init_cmd = f"specify init . --ai {ai_backend}"
+    if force:
+        init_cmd += " --force"
+
+    logger.info(f"🚀 [Spec-Kit] 初始化项目（AI 后端: {ai_backend}）...")
+
+    if dry_run:
+        logger.info(f"  [模拟运行] 将执行: {init_cmd}")
+        return (True, f"[模拟运行] 将使用 {ai_backend} 后端初始化")
+
+    # 执行 specify init
+    result = subprocess.run(
+        init_cmd,
+        shell=True,
+        timeout=300,
+    )
+    if result.returncode != 0:
+        logger.error("❌ 错误: Spec-Kit 初始化失败")
+        return (False, "初始化失败")
+
+    logger.info("✓ Spec-Kit 初始化成功")
+    return (True, f"使用 {ai_backend} 后端初始化成功")
+
+
+def _dd_bmad_method(dry_run: bool) -> tuple:
+    """BMad Method 安装处理
+
+    Args:
+        dry_run: 是否模拟运行
+
+    Returns:
+        (success: bool, message: str) 元组
+    """
+    logger.info("📋 [BMad Method] 检查环境...")
+
+    # 确定安装方式：优先 bunx，否则 npx
+    if shutil.which("bun"):
+        method = "bunx"
+    elif shutil.which("npx"):
+        method = "npx"
+    else:
+        logger.error("❌ 错误: 未找到 npx 或 bunx，无法安装 BMad Method")
+        logger.info("💡 提示: 请先运行 'mk install bun' 或 'mk install node' 安装")
+        return (False, "npx/bunx 未安装")
+
+    logger.info(f"✓ 将使用 {method} 安装 BMad Method")
+    logger.info("")
+
+    install_cmd = f"{method} bmad-method install"
+
+    logger.info("🚀 [BMad Method] 安装到当前项目...")
+
+    if dry_run:
+        logger.info(f"  [模拟运行] 将执行: {install_cmd}")
+        return (True, f"[模拟运行] 将使用 {method} 安装")
+
+    # 执行交互式安装（继承 stdin/stdout）
+    result = subprocess.run(
+        install_cmd,
+        shell=True,
+        timeout=600,
+    )
+    if result.returncode != 0:
+        logger.error("❌ 错误: BMad Method 安装失败")
+        return (False, "安装失败")
+
+    logger.info("✓ BMad Method 安装成功")
+    return (True, f"使用 {method} 安装成功")
+
+
+def cmd_dd(args: argparse.Namespace) -> int:
+    """执行 dd (driven development) 命令
+
+    为当前项目配置驱动开发工具（Spec-Kit、BMad Method）。
+
+    Args:
+        args: 解析后的命令行参数
+
+    Returns:
+        退出码（0 表示成功）
+    """
+    # 验证: 至少需要一个工具标志
+    if not args.spec_kit and not args.bmad_method:
+        logger.error("❌ 错误: 请至少指定一个工具标志（--spec-kit 或 --bmad-method）")
+        logger.info("💡 提示: 使用 mk dd --help 查看可用选项")
+        return 1
+
+    # 验证: --claude/--codex 需要 --spec-kit
+    if (args.claude or args.codex) and not args.spec_kit:
+        logger.error("❌ 错误: --claude/--codex 需要与 --spec-kit 一起使用")
+        logger.info("💡 提示: 使用 mk dd --spec-kit --claude 初始化 Spec-Kit")
+        return 1
+
+    # 确定 AI 后端
+    ai_backend = "codex" if args.codex else "claude"
+
+    logger.info("🔧 Mono-Kickstart - 配置驱动开发工具")
+    logger.info("")
+
+    if args.dry_run:
+        logger.info("🔍 [模拟运行模式]")
+        logger.info("")
+
+    results = {}
+
+    try:
+        # Spec-Kit 初始化
+        if args.spec_kit:
+            success, msg = _dd_spec_kit(ai_backend, args.force, args.dry_run)
+            results["Spec-Kit"] = (success, msg)
+            logger.info("")
+
+        # BMad Method 安装
+        if args.bmad_method:
+            success, msg = _dd_bmad_method(args.dry_run)
+            results["BMad Method"] = (success, msg)
+            logger.info("")
+
+        # 打印摘要
+        logger.info("=" * 60)
+        for tool_name, (success, msg) in results.items():
+            symbol = "✓" if success else "✗"
+            logger.info(f"{symbol} {tool_name}: {msg}")
+        logger.info("=" * 60)
+
+        # 判断退出码
+        failed = [k for k, (s, _) in results.items() if not s]
+        if len(failed) == len(results):
+            logger.error("❌ 所有工具配置都失败了")
+            return 1
+        elif failed:
+            logger.warning(f"⚠️  部分工具配置失败: {', '.join(failed)}")
+            return 0
+
+        if args.dry_run:
+            logger.info("✨ 模拟运行完成，未实际执行任何操作。")
+        else:
+            logger.info("✨ 驱动开发工具配置完成！")
+        return 0
+
+    except KeyboardInterrupt:
+        logger.error("\n❌ 用户中断操作")
+        return 130
+    except subprocess.TimeoutExpired:
+        logger.error("❌ 错误: 命令执行超时")
+        return 1
+    except Exception as e:
+        logger.error(f"❌ 配置过程中发生错误: {e}")
+        return 1
+
+
+def cmd_claude(args: argparse.Namespace) -> int:
+    """执行 claude 命令
+
+    为当前项目配置 Claude Code 设置（MCP 服务器等）。
+
+    Args:
+        args: 解析后的命令行参数
+
+    Returns:
+        退出码（0 表示成功）
+    """
+    # 验证: 至少需要一个操作
+    if not args.mcp and not args.allow and not args.mode:
+        logger.error("❌ 错误: 请指定要配置的内容（如 --mcp chrome、--allow all 或 --mode plan）")
+        logger.info("💡 提示: 使用 mk claude --help 查看可用选项")
+        return 1
+
+    logger.info("🔧 Mono-Kickstart - 配置 Claude Code 项目设置")
+    logger.info("")
+
+    if args.dry_run:
+        logger.info("🔍 [模拟运行模式]")
+        logger.info("")
+
+    try:
+        if args.mcp:
+            result = _claude_add_mcp(args.mcp, args.dry_run)
+            if result != 0:
+                return result
+
+        if args.allow:
+            result = _claude_set_allow(args.dry_run)
+            if result != 0:
+                return result
+
+        if args.mode:
+            result = _claude_set_mode(args.mode, args.dry_run)
+            if result != 0:
+                return result
+
+    except KeyboardInterrupt:
+        logger.error("\n❌ 用户中断操作")
+        return 130
+    except Exception as e:
+        logger.error(f"❌ 配置过程中发生错误: {e}")
+        return 1
+
+    return 0
+
+
+def _claude_add_mcp(server_key: str, dry_run: bool) -> int:
+    """添加 MCP 服务器配置到当前项目
+
+    将 MCP 服务器配置写入 .claude/settings.local.json。
+
+    Args:
+        server_key: MCP 服务器标识（如 chrome）
+        dry_run: 是否模拟运行
+
+    Returns:
+        退出码（0 表示成功）
+    """
+    server_info = MCP_SERVER_CONFIGS[server_key]
+    server_name = server_info["name"]
+    display_name = server_info["display_name"]
+    mcp_config = server_info["config"]
+
+    logger.info(f"📋 [MCP] 添加 {display_name} 服务器...")
+
+    # 目标文件
+    claude_dir = Path(".claude")
+    settings_file = claude_dir / "settings.local.json"
+
+    # 读取现有配置
+    existing_config = {}
+    if settings_file.exists():
+        try:
+            existing_config = json.loads(settings_file.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as e:
+            logger.warning(f"⚠️  读取现有配置失败，将创建新配置: {e}")
+
+    # 合并 MCP 配置（已存在则覆盖）
+    if "mcpServers" not in existing_config:
+        existing_config["mcpServers"] = {}
+    existing_config["mcpServers"][server_name] = mcp_config
+
+    if dry_run:
+        logger.info(f"  [模拟运行] 将写入 {settings_file}:")
+        logger.info(f"  {json.dumps({'mcpServers': {server_name: mcp_config}}, indent=2)}")
+        logger.info("")
+        logger.info("============================================================")
+        logger.info(f"○ {display_name}: [模拟运行] 将添加 MCP 服务器配置")
+        logger.info("============================================================")
+        logger.info("✨ 模拟运行完成，未实际写入任何配置。")
+        return 0
+
+    # 创建 .claude 目录
+    claude_dir.mkdir(parents=True, exist_ok=True)
+
+    # 写入配置
+    settings_file.write_text(
+        json.dumps(existing_config, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8"
+    )
+
+    logger.info(f"✓ {display_name} MCP 服务器配置已写入 {settings_file}")
+
+    # 尝试运行 claude mcp add 命令
+    claude_mcp_cmd = server_info["claude_mcp_add_cmd"]
+    if shutil.which("claude"):
+        logger.info("")
+        logger.info(f"📋 [MCP] 执行 claude mcp add 注册命令...")
+        result = subprocess.run(
+            claude_mcp_cmd,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode == 0:
+            logger.info(f"✓ 已通过 claude CLI 注册 {display_name} MCP 服务器")
+        else:
+            logger.warning(f"⚠️  claude mcp add 执行失败（配置文件已写入，可忽略）")
+    else:
+        logger.info(f"💡 提示: 也可手动执行 '{claude_mcp_cmd}' 注册 MCP 服务器")
+
+    logger.info("")
+    logger.info("============================================================")
+    logger.info(f"✓ {display_name}: MCP 服务器配置完成")
+    logger.info("============================================================")
+    logger.info("✨ Claude Code 项目设置配置完成！")
+    return 0
+
+
+def _claude_set_allow(dry_run: bool) -> int:
+    """配置权限允许所有命令
+
+    将 permissions.allow 设置为完整工具列表，写入 .claude/settings.local.json。
+
+    Args:
+        dry_run: 是否模拟运行
+
+    Returns:
+        退出码（0 表示成功）
+    """
+    logger.info("📋 [权限] 配置允许所有命令...")
+
+    # 目标文件
+    claude_dir = Path(".claude")
+    settings_file = claude_dir / "settings.local.json"
+
+    # 读取现有配置
+    existing_config = {}
+    if settings_file.exists():
+        try:
+            existing_config = json.loads(settings_file.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as e:
+            logger.warning(f"⚠️  读取现有配置失败，将创建新配置: {e}")
+
+    # 合并权限配置（覆盖 permissions.allow）
+    if "permissions" not in existing_config:
+        existing_config["permissions"] = {}
+    existing_config["permissions"]["allow"] = ALLOW_ALL_PERMISSIONS
+
+    if dry_run:
+        logger.info(f"  [模拟运行] 将写入 {settings_file}:")
+        logger.info(f"  {json.dumps({'permissions': {'allow': ALLOW_ALL_PERMISSIONS}}, indent=2)}")
+        logger.info("")
+        logger.info("============================================================")
+        logger.info("○ [模拟运行] 权限: 将配置允许所有命令")
+        logger.info("============================================================")
+        logger.info("✨ 模拟运行完成，未实际写入任何配置。")
+        return 0
+
+    # 创建 .claude 目录
+    claude_dir.mkdir(parents=True, exist_ok=True)
+
+    # 写入配置
+    settings_file.write_text(
+        json.dumps(existing_config, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8"
+    )
+
+    logger.info(f"✓ 权限配置已写入 {settings_file}")
+    logger.info(f"  permissions.allow = {json.dumps(ALLOW_ALL_PERMISSIONS)}")
+    logger.info("")
+    logger.info("============================================================")
+    logger.info("✓ 权限: 已配置允许所有命令")
+    logger.info("============================================================")
+    logger.info("✨ Claude Code 权限配置完成！")
+    return 0
+
+
+def _claude_set_mode(mode: str, dry_run: bool) -> int:
+    """配置权限模式
+
+    设置 permissionMode，写入 .claude/settings.local.json。
+
+    Args:
+        mode: 权限模式（如 plan）
+        dry_run: 是否模拟运行
+
+    Returns:
+        退出码（0 表示成功）
+    """
+    logger.info(f"📋 [模式] 配置 {mode} 模式...")
+
+    # 目标文件
+    claude_dir = Path(".claude")
+    settings_file = claude_dir / "settings.local.json"
+
+    # 读取现有配置
+    existing_config = {}
+    if settings_file.exists():
+        try:
+            existing_config = json.loads(settings_file.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as e:
+            logger.warning(f"⚠️  读取现有配置失败，将创建新配置: {e}")
+
+    existing_config["permissionMode"] = mode
+
+    if dry_run:
+        logger.info(f"  [模拟运行] 将写入 {settings_file}:")
+        logger.info(f"  {json.dumps({'permissionMode': mode}, indent=2)}")
+        logger.info("")
+        logger.info("============================================================")
+        logger.info(f"○ [模拟运行] 模式: 将配置 permissionMode = {mode}")
+        logger.info("============================================================")
+        logger.info("✨ 模拟运行完成，未实际写入任何配置。")
+        return 0
+
+    # 创建 .claude 目录
+    claude_dir.mkdir(parents=True, exist_ok=True)
+
+    # 写入配置
+    settings_file.write_text(
+        json.dumps(existing_config, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8"
+    )
+
+    logger.info(f"✓ 模式配置已写入 {settings_file}")
+    logger.info(f"  permissionMode = \"{mode}\"")
+    logger.info("")
+    logger.info("============================================================")
+    logger.info(f"✓ 模式: 已配置 permissionMode = {mode}")
+    logger.info("============================================================")
+    logger.info("✨ Claude Code 模式配置完成！")
+    return 0
+
+
 def main() -> int:
     """主入口函数
 
@@ -1278,6 +1851,10 @@ def main() -> int:
         return cmd_download(args)
     elif args.command == 'config':
         return cmd_config(args)
+    elif args.command == 'dd':
+        return cmd_dd(args)
+    elif args.command == 'claude':
+        return cmd_claude(args)
     else:
         parser.print_help()
         return 1

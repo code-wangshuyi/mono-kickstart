@@ -18,7 +18,7 @@ _mk_completion() {
     prev="${COMP_WORDS[COMP_CWORD-1]}"
     
     # 主命令
-    local commands="init upgrade install set-default setup-shell status download config"
+    local commands="init upgrade install set-default setup-shell status download config dd claude"
 
     # 工具列表
     local tools="nvm node conda bun uv claude-code codex npx spec-kit bmad-method"
@@ -64,6 +64,22 @@ _mk_completion() {
                 COMPREPLY=( $(compgen -W "${download_tools}" -- ${cur}) )
             fi
             ;;
+        dd)
+            local dd_opts="-s --spec-kit -b --bmad-method -c --claude -x --codex -f --force --dry-run --help"
+            COMPREPLY=( $(compgen -W "${dd_opts}" -- ${cur}) )
+            ;;
+        claude)
+            if [[ ${prev} == "--mcp" ]]; then
+                COMPREPLY=( $(compgen -W "chrome context7" -- ${cur}) )
+            elif [[ ${prev} == "--allow" ]]; then
+                COMPREPLY=( $(compgen -W "all" -- ${cur}) )
+            elif [[ ${prev} == "--mode" ]]; then
+                COMPREPLY=( $(compgen -W "plan" -- ${cur}) )
+            else
+                local claude_opts="--mcp --allow --mode --dry-run --help"
+                COMPREPLY=( $(compgen -W "${claude_opts}" -- ${cur}) )
+            fi
+            ;;
         config)
             if [ $COMP_CWORD -eq 2 ]; then
                 COMPREPLY=( $(compgen -W "mirror" -- ${cur}) )
@@ -101,6 +117,8 @@ _mk() {
         'status:查看已安装工具的状态和版本'
         'config:管理配置（镜像源等）'
         'download:下载工具安装包到本地（不安装）'
+        'dd:配置驱动开发工具（Spec-Kit、BMad Method）'
+        'claude:配置 Claude Code 项目设置（MCP 服务器等）'
     )
 
     tools=(
@@ -163,6 +181,29 @@ _mk() {
                         '-o[下载文件保存目录]:dir:_directories' \
                         '--output[下载文件保存目录]:dir:_directories' \
                         '--dry-run[模拟运行，不实际下载]' \
+                        '--help[显示帮助信息]'
+                    ;;
+                dd)
+                    _arguments \
+                        '-s[初始化 Spec-Kit]' \
+                        '--spec-kit[初始化 Spec-Kit]' \
+                        '-b[安装 BMad Method]' \
+                        '--bmad-method[安装 BMad Method]' \
+                        '-c[使用 Claude 作为 AI 后端]' \
+                        '--claude[使用 Claude 作为 AI 后端]' \
+                        '-x[使用 Codex 作为 AI 后端]' \
+                        '--codex[使用 Codex 作为 AI 后端]' \
+                        '-f[强制重新初始化]' \
+                        '--force[强制重新初始化]' \
+                        '--dry-run[模拟运行，不实际执行]' \
+                        '--help[显示帮助信息]'
+                    ;;
+                claude)
+                    _arguments \
+                        '--mcp[添加 MCP 服务器配置]:server:(chrome context7)' \
+                        '--allow[配置权限允许所有命令]:scope:(all)' \
+                        '--mode[设置权限模式]:mode:(plan)' \
+                        '--dry-run[模拟运行，不实际写入配置]' \
                         '--help[显示帮助信息]'
                     ;;
                 config)
@@ -232,6 +273,8 @@ complete -c mk -f -n "__fish_use_subcommand" -a "setup-shell" -d "配置 shell�
 complete -c mk -f -n "__fish_use_subcommand" -a "status" -d "查看已安装工具的状态和版本"
 complete -c mk -f -n "__fish_use_subcommand" -a "download" -d "下载工具安装包到本地（不安装）"
 complete -c mk -f -n "__fish_use_subcommand" -a "config" -d "管理配置（镜像源等）"
+complete -c mk -f -n "__fish_use_subcommand" -a "dd" -d "配置驱动开发工具（Spec-Kit、BMad Method）"
+complete -c mk -f -n "__fish_use_subcommand" -a "claude" -d "配置 Claude Code 项目设置（MCP 服务器等）"
 
 # init 命令选项
 complete -c mk -f -n "__fish_seen_subcommand_from init" -l config -d "配置文件路径"
@@ -268,6 +311,20 @@ complete -c mk -f -n "__fish_seen_subcommand_from mirror; and not __fish_seen_su
 complete -c mk -f -n "__fish_seen_subcommand_from set" -a "china" -d "国内镜像预设"
 complete -c mk -f -n "__fish_seen_subcommand_from set" -a "default" -d "上游默认预设"
 complete -c mk -f -n "__fish_seen_subcommand_from set" -a "npm bun pip uv conda"
+
+# dd 命令选项
+complete -c mk -f -n "__fish_seen_subcommand_from dd" -s s -l spec-kit -d "初始化 Spec-Kit"
+complete -c mk -f -n "__fish_seen_subcommand_from dd" -s b -l bmad-method -d "安装 BMad Method"
+complete -c mk -f -n "__fish_seen_subcommand_from dd" -s c -l claude -d "使用 Claude 作为 AI 后端"
+complete -c mk -f -n "__fish_seen_subcommand_from dd" -s x -l codex -d "使用 Codex 作为 AI 后端"
+complete -c mk -f -n "__fish_seen_subcommand_from dd" -s f -l force -d "强制重新初始化"
+complete -c mk -f -n "__fish_seen_subcommand_from dd" -l dry-run -d "模拟运行"
+
+# claude 命令选项
+complete -c mk -f -n "__fish_seen_subcommand_from claude" -l mcp -d "添加 MCP 服务器配置" -a "chrome context7"
+complete -c mk -f -n "__fish_seen_subcommand_from claude" -l allow -d "配置权限允许所有命令" -a "all"
+complete -c mk -f -n "__fish_seen_subcommand_from claude" -l mode -d "设置权限模式" -a "plan"
+complete -c mk -f -n "__fish_seen_subcommand_from claude" -l dry-run -d "模拟运行"
 
 # config mirror reset --tool
 complete -c mk -f -n "__fish_seen_subcommand_from reset" -l tool -d "指定工具" -a "npm bun pip uv conda"
