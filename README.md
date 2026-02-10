@@ -1506,6 +1506,11 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 - **问题反馈**: https://github.com/mono-kickstart/mono-kickstart/issues
 - **讨论**: https://github.com/mono-kickstart/mono-kickstart/discussions
 
+### 工具指南
+
+- **GitHub Copilot CLI 指南**: [docs/copilot-cli-guide.md](docs/copilot-cli-guide.md)
+- **配置示例**: [docs/examples/](docs/examples/)
+
 ## 更新日志
 
 查看 [CHANGELOG.md](CHANGELOG.md) 了解版本历史和变更记录。
