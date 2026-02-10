@@ -484,6 +484,7 @@ class TestDetectAllTools:
              patch.object(detector, 'detect_claude_code') as mock_claude, \
              patch.object(detector, 'detect_codex') as mock_codex, \
              patch.object(detector, 'detect_npx') as mock_npx, \
+             patch.object(detector, 'detect_uipro') as mock_uipro, \
              patch.object(detector, 'detect_spec_kit') as mock_spec, \
              patch.object(detector, 'detect_bmad') as mock_bmad:
 
@@ -496,6 +497,7 @@ class TestDetectAllTools:
             mock_claude.return_value = ToolStatus("claude-code", False)
             mock_codex.return_value = ToolStatus("codex", False)
             mock_npx.return_value = ToolStatus("npx", False)
+            mock_uipro.return_value = ToolStatus("uipro", False)
             mock_spec.return_value = ToolStatus("spec-kit", False)
             mock_bmad.return_value = ToolStatus("bmad-method", False)
 
@@ -503,7 +505,7 @@ class TestDetectAllTools:
             result = detector.detect_all_tools()
 
             # Verify all tools are in result
-            assert len(result) == 10
+            assert len(result) == 11
             assert "nvm" in result
             assert "node" in result
             assert "conda" in result
@@ -512,6 +514,7 @@ class TestDetectAllTools:
             assert "claude-code" in result
             assert "codex" in result
             assert "npx" in result
+            assert "uipro" in result
             assert "spec-kit" in result
             assert "bmad-method" in result
 
@@ -532,12 +535,13 @@ class TestDetectAllTools:
              patch.object(detector, 'detect_claude_code') as mock_claude, \
              patch.object(detector, 'detect_codex') as mock_codex, \
              patch.object(detector, 'detect_npx') as mock_npx, \
+             patch.object(detector, 'detect_uipro') as mock_uipro, \
              patch.object(detector, 'detect_spec_kit') as mock_spec, \
              patch.object(detector, 'detect_bmad') as mock_bmad:
 
             # Set default return values
             for mock in [mock_nvm, mock_node, mock_conda, mock_bun, mock_uv,
-                        mock_claude, mock_codex, mock_npx, mock_spec, mock_bmad]:
+                        mock_claude, mock_codex, mock_npx, mock_uipro, mock_spec, mock_bmad]:
                 mock.return_value = ToolStatus("tool", False)
 
             # Call detect_all_tools
@@ -552,6 +556,7 @@ class TestDetectAllTools:
             mock_claude.assert_called_once()
             mock_codex.assert_called_once()
             mock_npx.assert_called_once()
+            mock_uipro.assert_called_once()
             mock_spec.assert_called_once()
             mock_bmad.assert_called_once()
     
@@ -565,6 +570,7 @@ class TestDetectAllTools:
              patch.object(detector, 'detect_claude_code', return_value=ToolStatus("claude-code", False)), \
              patch.object(detector, 'detect_codex', return_value=ToolStatus("codex", False)), \
              patch.object(detector, 'detect_npx', return_value=ToolStatus("npx", True, "10.0.0")), \
+             patch.object(detector, 'detect_uipro', return_value=ToolStatus("uipro", False)), \
              patch.object(detector, 'detect_spec_kit', return_value=ToolStatus("spec-kit", True, "1.5.0")), \
              patch.object(detector, 'detect_bmad', return_value=ToolStatus("bmad-method", False)):
 
@@ -575,7 +581,7 @@ class TestDetectAllTools:
             not_installed_count = sum(1 for status in result.values() if not status.installed)
 
             assert installed_count == 5  # nvm, node, uv, npx, spec-kit
-            assert not_installed_count == 5  # conda, bun, claude-code, codex, bmad-method
+            assert not_installed_count == 6  # conda, bun, claude-code, codex, uipro, bmad-method
 
 
 class TestPipDetection:

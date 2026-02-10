@@ -21,7 +21,7 @@ _mk_completion() {
     local commands="init upgrade install set-default setup-shell status download config dd claude"
 
     # 工具列表
-    local tools="nvm node conda bun uv claude-code codex npx spec-kit bmad-method"
+    local tools="nvm node conda bun uv claude-code codex npx uipro spec-kit bmad-method"
 
     # set-default 支持的工具
     local default_tools="node"
@@ -130,6 +130,7 @@ _mk() {
         'claude-code:Claude Code CLI'
         'codex:OpenAI Codex CLI'
         'npx:npm 包执行器'
+        'uipro:UIPro CLI 工具'
         'spec-kit:Spec 驱动开发工具'
         'bmad-method:BMAD 敏捷开发框架'
     )
@@ -160,7 +161,7 @@ _mk() {
                     ;;
                 upgrade|install)
                     _arguments \
-                        '1:tool:(nvm node conda bun uv claude-code codex npx spec-kit bmad-method)' \
+                        '1:tool:(nvm node conda bun uv claude-code codex npx uipro spec-kit bmad-method)' \
                         '--all[所有工具]' \
                         '--dry-run[模拟运行]' \
                         '--help[显示帮助信息]'
@@ -284,7 +285,7 @@ complete -c mk -f -n "__fish_seen_subcommand_from init" -l force -d "强制覆�
 complete -c mk -f -n "__fish_seen_subcommand_from init" -l dry-run -d "模拟运行，不实际安装"
 
 # upgrade 和 install 命令的工具名称
-set -l tools nvm node conda bun uv claude-code codex npx spec-kit bmad-method
+set -l tools nvm node conda bun uv claude-code codex npx uipro spec-kit bmad-method
 complete -c mk -f -n "__fish_seen_subcommand_from upgrade install" -a "$tools"
 
 # upgrade 和 install 命令选项

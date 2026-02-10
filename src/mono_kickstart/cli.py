@@ -37,6 +37,7 @@ AVAILABLE_TOOLS = [
     "claude-code",
     "codex",
     "npx",
+    "uipro",
     "spec-kit",
     "bmad-method",
 ]

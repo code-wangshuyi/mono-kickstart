@@ -289,6 +289,27 @@ class ToolDetector:
             path=path
         )
     
+    def detect_uipro(self) -> ToolStatus:
+        """检测 UIPro CLI
+
+        UIPro CLI 通过 npm/bun 全局安装，命令名为 uipro。
+
+        Returns:
+            ToolStatus: UIPro CLI 的状态信息
+        """
+        if not self.is_command_available("uipro"):
+            return ToolStatus(name="uipro", installed=False)
+
+        version = self.get_command_version("uipro", "versions")
+        path = shutil.which("uipro")
+
+        return ToolStatus(
+            name="uipro",
+            installed=True,
+            version=version,
+            path=path
+        )
+
     def detect_bmad(self) -> ToolStatus:
         """检测 BMad Method
         
@@ -367,6 +388,7 @@ class ToolDetector:
             "claude-code": self.detect_claude_code(),
             "codex": self.detect_codex(),
             "npx": self.detect_npx(),
+            "uipro": self.detect_uipro(),
             "spec-kit": self.detect_spec_kit(),
             "bmad-method": self.detect_bmad(),
         }

@@ -25,6 +25,7 @@ from .installers.npx_installer import NpxInstaller
 from .installers.node_installer import NodeInstaller
 from .installers.nvm_installer import NVMInstaller
 from .installers.spec_kit_installer import SpecKitInstaller
+from .installers.uipro_installer import UiproInstaller
 from .installers.uv_installer import UVInstaller
 from .mirror_config import MirrorConfigurator
 from .platform_detector import PlatformInfo
@@ -43,8 +44,9 @@ INSTALL_ORDER = [
     "copilot-cli",   # 7. 安装 GitHub Copilot CLI（依赖 Node.js 22+）
     "codex",         # 8. 安装 Codex CLI（可能依赖 Bun）
     "npx",           # 9. 安装 npx（依赖 Node.js/npm）
-    "spec-kit",      # 10. 安装 Spec Kit（依赖 uv）
-    "bmad-method",   # 11. 安装 BMad Method（依赖 Node.js/Bun/npx）
+    "uipro",         # 10. 安装 UIPro CLI（依赖 npm/Bun）
+    "spec-kit",      # 11. 安装 Spec Kit（依赖 uv）
+    "bmad-method",   # 12. 安装 BMad Method（依赖 Node.js/Bun/npx）
 ]
 
 
@@ -118,6 +120,7 @@ class InstallOrchestrator:
             "copilot-cli": CopilotCLIInstaller,
             "codex": CodexInstaller,
             "npx": NpxInstaller,
+            "uipro": UiproInstaller,
             "spec-kit": SpecKitInstaller,
             "bmad-method": BMadInstaller,
         }

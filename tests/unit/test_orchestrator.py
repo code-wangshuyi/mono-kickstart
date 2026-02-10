@@ -245,10 +245,11 @@ class TestInstallAllTools:
             "copilot-cli": ToolConfig(enabled=False),
             "codex": ToolConfig(enabled=False),
             "npx": ToolConfig(enabled=False),
+            "uipro": ToolConfig(enabled=False),
             "spec-kit": ToolConfig(enabled=False),
             "bmad-method": ToolConfig(enabled=False),
         }
-        
+
         # Mock 安装器
         def create_mock_installer(tool_name):
             mock_installer = Mock()
@@ -258,10 +259,10 @@ class TestInstallAllTools:
                 message=f"{tool_name} 安装成功"
             )
             return mock_installer
-        
+
         with patch.object(orchestrator, '_create_installer', side_effect=lambda name: create_mock_installer(name)):
             reports = orchestrator.install_all_tools()
-        
+
         # 验证所有工具都被安装
         assert len(reports) == 3
         assert "nvm" in reports
@@ -286,6 +287,7 @@ class TestInstallAllTools:
             "copilot-cli": ToolConfig(enabled=False),
             "codex": ToolConfig(enabled=False),
             "npx": ToolConfig(enabled=False),
+            "uipro": ToolConfig(enabled=False),
             "spec-kit": ToolConfig(enabled=False),
             "bmad-method": ToolConfig(enabled=False),
         }
@@ -334,6 +336,7 @@ class TestInstallAllTools:
             "copilot-cli": ToolConfig(enabled=False),
             "codex": ToolConfig(enabled=False),
             "npx": ToolConfig(enabled=False),
+            "uipro": ToolConfig(enabled=False),
             "spec-kit": ToolConfig(enabled=False),
             "bmad-method": ToolConfig(enabled=False),
         }
@@ -371,6 +374,7 @@ class TestInstallAllTools:
             "copilot-cli": ToolConfig(enabled=False),
             "codex": ToolConfig(enabled=False),
             "npx": ToolConfig(enabled=False),
+            "uipro": ToolConfig(enabled=False),
             "spec-kit": ToolConfig(enabled=False),
             "bmad-method": ToolConfig(enabled=False),
         }
@@ -1028,6 +1032,7 @@ class TestErrorHandling:
             "copilot-cli": ToolConfig(enabled=False),
             "codex": ToolConfig(enabled=False),
             "npx": ToolConfig(enabled=False),
+            "uipro": ToolConfig(enabled=False),
             "spec-kit": ToolConfig(enabled=False),
             "bmad-method": ToolConfig(enabled=False),
         }
