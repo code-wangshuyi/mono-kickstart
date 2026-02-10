@@ -422,6 +422,66 @@ class TestConfigManager:
         assert len(errors) > 0
         assert "invalid-tool" in errors[0]
     
+    def test_validate_copilot_cli_tool_name(self):
+        """测试验证 copilot-cli 工具名称"""
+        config = Config(
+            tools={
+                "copilot-cli": ToolConfig(enabled=True)
+            }
+        )
+        
+        manager = ConfigManager()
+        errors = manager.validate(config)
+        
+        assert errors == []
+    
+    def test_copilot_cli_default_config(self):
+        """测试 copilot-cli 配置默认值的正确性
+        
+        验证当配置文件中未指定 copilot-cli 配置时，系统使用默认配置（enabled=True）
+        Requirements: 6.1, 6.4
+        """
+        # 创建一个空配置（未指定 copilot-cli）
+        config = Config()
+        
+        # 验证默认情况下 tools 字典为空
+        assert "copilot-cli" not in config.tools
+        
+        # 当工具未在配置中指定时，应该使用 ToolConfig 的默认值
+        default_tool_config = ToolConfig()
+        assert default_tool_config.enabled is True
+        assert default_tool_config.version is None
+        assert default_tool_config.install_via is None
+        assert default_tool_config.extra_options == {}
+    
+    def test_copilot_cli_custom_config(self):
+        """测试 copilot-cli 自定义配置
+        
+        验证可以通过配置文件设置 copilot-cli 的各项配置
+        Requirements: 6.2, 6.3
+        """
+        config = Config(
+            tools={
+                "copilot-cli": ToolConfig(
+                    enabled=False,
+                    version="1.0.0",
+                    install_via="npm",
+                    extra_options={"custom": "value"}
+                )
+            }
+        )
+        
+        # 验证自定义配置正确设置
+        assert config.tools["copilot-cli"].enabled is False
+        assert config.tools["copilot-cli"].version == "1.0.0"
+        assert config.tools["copilot-cli"].install_via == "npm"
+        assert config.tools["copilot-cli"].extra_options == {"custom": "value"}
+        
+        # 验证配置通过验证
+        manager = ConfigManager()
+        errors = manager.validate(config)
+        assert errors == []
+    
     def test_validate_invalid_install_via(self):
         """测试验证无效的 install_via"""
         config = Config(

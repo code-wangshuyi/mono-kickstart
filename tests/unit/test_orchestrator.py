@@ -242,7 +242,9 @@ class TestInstallAllTools:
             "conda": ToolConfig(enabled=False),
             "uv": ToolConfig(enabled=False),
             "claude-code": ToolConfig(enabled=False),
+            "copilot-cli": ToolConfig(enabled=False),
             "codex": ToolConfig(enabled=False),
+            "npx": ToolConfig(enabled=False),
             "spec-kit": ToolConfig(enabled=False),
             "bmad-method": ToolConfig(enabled=False),
         }
@@ -281,7 +283,9 @@ class TestInstallAllTools:
             "conda": ToolConfig(enabled=False),
             "uv": ToolConfig(enabled=False),
             "claude-code": ToolConfig(enabled=False),
+            "copilot-cli": ToolConfig(enabled=False),
             "codex": ToolConfig(enabled=False),
+            "npx": ToolConfig(enabled=False),
             "spec-kit": ToolConfig(enabled=False),
             "bmad-method": ToolConfig(enabled=False),
         }
@@ -327,7 +331,9 @@ class TestInstallAllTools:
             "conda": ToolConfig(enabled=False),
             "uv": ToolConfig(enabled=False),
             "claude-code": ToolConfig(enabled=False),
+            "copilot-cli": ToolConfig(enabled=False),
             "codex": ToolConfig(enabled=False),
+            "npx": ToolConfig(enabled=False),
             "spec-kit": ToolConfig(enabled=False),
             "bmad-method": ToolConfig(enabled=False),
         }
@@ -362,7 +368,9 @@ class TestInstallAllTools:
             "bun": ToolConfig(enabled=False),
             "uv": ToolConfig(enabled=False),
             "claude-code": ToolConfig(enabled=False),
+            "copilot-cli": ToolConfig(enabled=False),
             "codex": ToolConfig(enabled=False),
+            "npx": ToolConfig(enabled=False),
             "spec-kit": ToolConfig(enabled=False),
             "bmad-method": ToolConfig(enabled=False),
         }
@@ -973,7 +981,7 @@ class TestCreateInstaller:
         """测试创建有效工具的安装器"""
         valid_tools = [
             "nvm", "node", "conda", "bun", "uv",
-            "claude-code", "codex", "spec-kit", "bmad-method"
+            "claude-code", "copilot-cli", "codex", "spec-kit", "bmad-method"
         ]
         
         for tool_name in valid_tools:
@@ -1017,7 +1025,9 @@ class TestErrorHandling:
             "conda": ToolConfig(enabled=False),
             "uv": ToolConfig(enabled=False),
             "claude-code": ToolConfig(enabled=False),
+            "copilot-cli": ToolConfig(enabled=False),
             "codex": ToolConfig(enabled=False),
+            "npx": ToolConfig(enabled=False),
             "spec-kit": ToolConfig(enabled=False),
             "bmad-method": ToolConfig(enabled=False),
         }
@@ -1081,7 +1091,7 @@ class TestInstallOrderConstant:
         """测试安装顺序包含预期的工具"""
         expected_tools = [
             "nvm", "node", "conda", "bun", "uv",
-            "claude-code", "codex", "spec-kit", "bmad-method"
+            "claude-code", "copilot-cli", "codex", "spec-kit", "bmad-method"
         ]
         
         for tool in expected_tools:
@@ -1097,3 +1107,140 @@ class TestInstallOrderConstant:
         
         # Node.js 必须在 bmad-method 之前
         assert INSTALL_ORDER.index("node") < INSTALL_ORDER.index("bmad-method")
+        
+        # Node.js 必须在 copilot-cli 之前（copilot-cli 依赖 Node.js 22+）
+        assert INSTALL_ORDER.index("node") < INSTALL_ORDER.index("copilot-cli")
+
+
+
+class TestCopilotCLIOrchestratorIntegration:
+    """测试 Copilot CLI 编排器集成
+    
+    **Validates: Requirements 7.1, 7.2, 7.3, 7.4**
+    """
+    
+    def test_install_order_contains_copilot_cli(self):
+        """测试 INSTALL_ORDER 中包含 copilot-cli
+        
+        **Validates: Requirements 7.1**
+        """
+        assert "copilot-cli" in INSTALL_ORDER
+    
+    def test_copilot_cli_after_node(self):
+        """测试 copilot-cli 在 node 之后
+        
+        Copilot CLI 依赖 Node.js 22+，因此必须在 node 之后安装。
+        
+        **Validates: Requirements 7.2**
+        """
+        node_index = INSTALL_ORDER.index("node")
+        copilot_index = INSTALL_ORDER.index("copilot-cli")
+        
+        assert copilot_index > node_index, \
+            "copilot-cli 必须在 node 之后安装（依赖 Node.js 22+）"
+    
+    def test_create_installer_creates_copilot_cli_installer(self, orchestrator):
+        """测试 _create_installer() 能正确创建 CopilotCLIInstaller 实例
+        
+        **Validates: Requirements 7.3**
+        """
+        from mono_kickstart.installers.copilot_installer import CopilotCLIInstaller
+        
+        installer = orchestrator._create_installer("copilot-cli")
+        
+        assert installer is not None
+        assert isinstance(installer, CopilotCLIInstaller)
+    
+    def test_create_installer_passes_config_to_copilot_cli_installer(self, orchestrator):
+        """测试 _create_installer() 将配置传递给 CopilotCLIInstaller
+        
+        **Validates: Requirements 7.3**
+        """
+        # 设置 copilot-cli 配置
+        orchestrator.config.tools["copilot-cli"] = ToolConfig(
+            enabled=True,
+            version="1.0.0"
+        )
+        
+        installer = orchestrator._create_installer("copilot-cli")
+        
+        assert installer is not None
+        assert installer.config.enabled is True
+        assert installer.config.version == "1.0.0"
+    
+    def test_create_installer_passes_platform_info_to_copilot_cli_installer(self, orchestrator):
+        """测试 _create_installer() 将平台信息传递给 CopilotCLIInstaller
+        
+        **Validates: Requirements 7.3**
+        """
+        installer = orchestrator._create_installer("copilot-cli")
+        
+        assert installer is not None
+        assert installer.platform_info == orchestrator.platform_info
+    
+    def test_install_all_tools_includes_copilot_cli(self, orchestrator):
+        """测试 install_all_tools() 包含 copilot-cli
+        
+        **Validates: Requirements 7.4**
+        """
+        # 启用 copilot-cli
+        orchestrator.config.tools["copilot-cli"] = ToolConfig(enabled=True)
+        
+        # Mock 所有安装器
+        with patch.object(orchestrator, '_create_installer') as mock_create:
+            mock_installer = Mock()
+            mock_installer.install.return_value = InstallReport(
+                tool_name="copilot-cli",
+                result=InstallResult.SUCCESS,
+                message="安装成功"
+            )
+            mock_create.return_value = mock_installer
+            
+            reports = orchestrator.install_all_tools()
+        
+        # 验证 copilot-cli 被安装
+        assert "copilot-cli" in reports
+    
+    def test_install_all_tools_respects_copilot_cli_order(self, orchestrator):
+        """测试 install_all_tools() 按正确顺序安装 copilot-cli
+        
+        验证 copilot-cli 在 node 之后安装。
+        
+        **Validates: Requirements 7.2, 7.4**
+        """
+        # 启用 node 和 copilot-cli
+        orchestrator.config.tools = {
+            "node": ToolConfig(enabled=True),
+            "copilot-cli": ToolConfig(enabled=True),
+        }
+        
+        install_sequence = []
+        
+        def track_install(tool_name):
+            """追踪安装顺序"""
+            def mock_install():
+                install_sequence.append(tool_name)
+                return InstallReport(
+                    tool_name=tool_name,
+                    result=InstallResult.SUCCESS,
+                    message="安装成功"
+                )
+            return mock_install
+        
+        # Mock _create_installer 以追踪安装顺序
+        original_create = orchestrator._create_installer
+        
+        def mock_create_installer(tool_name):
+            installer = original_create(tool_name)
+            if installer:
+                installer.install = track_install(tool_name)
+            return installer
+        
+        with patch.object(orchestrator, '_create_installer', side_effect=mock_create_installer):
+            orchestrator.install_all_tools()
+        
+        # 验证安装顺序
+        assert "node" in install_sequence
+        assert "copilot-cli" in install_sequence
+        assert install_sequence.index("node") < install_sequence.index("copilot-cli"), \
+            "node 必须在 copilot-cli 之前安装"

@@ -9,6 +9,7 @@ from .conda_installer import CondaInstaller
 from .bun_installer import BunInstaller
 from .uv_installer import UVInstaller
 from .claude_installer import ClaudeCodeInstaller
+from .copilot_installer import CopilotCLIInstaller
 from .codex_installer import CodexInstaller
 from .npx_installer import NpxInstaller
 from .spec_kit_installer import SpecKitInstaller
@@ -21,6 +22,7 @@ __all__ = [
     "BunInstaller",
     "UVInstaller",
     "ClaudeCodeInstaller",
+    "CopilotCLIInstaller",
     "CodexInstaller",
     "NpxInstaller",
     "SpecKitInstaller",

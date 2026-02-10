@@ -19,7 +19,7 @@ Mono-Kickstart 是一个 Monorepo 项目模板脚手架 CLI 工具，通过一�
 
 - 🚀 **一键初始化**: 一条命令完成 Monorepo 项目创建和开发环境配置
 - 🛠️ **自动化工具链**: 自动检测和安装 NVM、Node.js、Conda、Bun、uv 等开发工具
-- 🤖 **AI 编程助手**: 自动安装 Claude Code CLI、Codex CLI、Spec Kit、BMad Method
+- 🤖 **AI 编程助手**: 自动安装 Claude Code CLI、GitHub Copilot CLI、Codex CLI、Spec Kit、BMad Method
 - 🌏 **中国镜像源**: 自动配置 npm、Bun、PyPI 镜像源，加速下载
 - 🔄 **幂等性**: 可安全重复执行，不产生副作用
 - 💪 **容错性**: 单个工具失败不影响整体流程
@@ -106,8 +106,12 @@ mk init
 这将：
 1. 检测并安装所需的开发工具（NVM、Node.js、Conda、Bun、uv 等）
 2. 配置中国镜像源（加速下载）
-3. 安装 AI 编程助手（Claude Code CLI、Codex CLI、Spec Kit、BMad Method）
+3. 安装 AI 编程助手（Claude Code CLI、GitHub Copilot CLI、Codex CLI、Spec Kit、BMad Method）
 4. 创建标准化的 Monorepo 项目结构
+
+> **注意**: 
+> - GitHub Copilot CLI 需要 Node.js 22 或更高版本，且仅支持 macOS 和 Linux 平台
+> - 安装完成后，需要运行 `copilot auth login` 进行 GitHub 认证才能使用
 
 ### 使用交互式配置
 
@@ -145,6 +149,8 @@ tools:
   uv:
     enabled: true
   claude-code:
+    enabled: true
+  copilot-cli:
     enabled: true
   codex:
     enabled: false  # 不安装 Codex
@@ -292,6 +298,11 @@ tools:
   claude-code:
     enabled: true
   
+  # GitHub Copilot CLI (GitHub AI 助手)
+  # 注意：需要 Node.js 22 或更高版本，仅支持 macOS 和 Linux
+  copilot-cli:
+    enabled: true
+  
   # Codex CLI (OpenAI AI 助手)
   codex:
     enabled: true
@@ -337,6 +348,8 @@ tools:
   conda:
     enabled: false
   claude-code:
+    enabled: false
+  copilot-cli:
     enabled: false
   codex:
     enabled: false
@@ -477,6 +490,17 @@ Mono-Kickstart 支持自动安装和配置以下开发工具：
 - **验证**: `claude doctor`
 - **特性**: 强大的代码理解和生成能力
 
+#### GitHub Copilot CLI
+- **用途**: GitHub 提供的 AI 命令行助手
+- **版本**: 最新版本
+- **安装方式**: 通过 npm 全局安装 (`npm install -g @github/copilot`)
+- **验证**: `copilot --version`
+- **依赖**: 需要 Node.js 22 或更高版本
+- **平台**: 仅支持 macOS 和 Linux（不支持 Windows）
+- **特性**: AI 驱动的命令行建议和代码生成
+- **认证**: 安装后需要运行 `copilot auth login` 进行 GitHub 认证
+- **配置**: 可通过配置文件的 `copilot-cli.enabled` 字段控制是否安装
+
 #### Codex CLI
 - **用途**: OpenAI 提供的 AI 编程助手命令行工具
 - **版本**: 最新版本
@@ -535,9 +559,10 @@ Mono-Kickstart 支持自动安装和配置以下开发工具：
 7. **uv** - 独立安装
 8. **uv 镜像源** - 配置 uv 镜像
 9. **Claude Code CLI** - 独立安装
-10. **Codex CLI** - 依赖 Bun 或 Node.js
-11. **Spec Kit** - 依赖 uv
-12. **BMad Method** - 依赖 Node.js 或 Bun
+10. **GitHub Copilot CLI** - 依赖 Node.js 22+
+11. **Codex CLI** - 依赖 Bun 或 Node.js
+12. **Spec Kit** - 依赖 uv
+13. **BMad Method** - 依赖 Node.js 或 Bun
 
 ## 命令参考
 
@@ -622,6 +647,7 @@ mk upgrade [TOOL] [OPTIONS]
 - `bun` - Bun
 - `uv` - uv
 - `claude-code` - Claude Code CLI
+- `copilot-cli` - GitHub Copilot CLI
 - `codex` - Codex CLI
 - `spec-kit` - Spec Kit
 - `bmad-method` - BMad Method
@@ -635,7 +661,7 @@ mk upgrade --all
 # 升级特定工具
 mk upgrade node
 mk upgrade bun
-mk upgrade uv
+mk upgrade copilot-cli
 
 # 模拟运行
 mk upgrade --all --dry-run
@@ -674,6 +700,7 @@ mk install --all
 
 # 安装特定工具
 mk install bun
+mk install copilot-cli
 mk install claude-code
 
 # 模拟运行
@@ -846,6 +873,7 @@ A: Mono-Kickstart 不提供卸载功能，但您可以手动卸载：
 - **Bun**: `rm -rf ~/.bun`
 - **uv**: `rm ~/.cargo/bin/uv`
 - **Claude Code**: 参考官方文档
+- **GitHub Copilot CLI**: `npm uninstall -g @github/copilot`
 - **Codex**: `npm uninstall -g codex` 或 `bun remove -g codex`
 - **Spec Kit**: `uv tool uninstall specify-cli`
 
@@ -858,8 +886,74 @@ A: 各工具的默认安装位置：
 - **Bun**: `~/.bun`
 - **uv**: `~/.cargo/bin/`
 - **Claude Code**: `/usr/local/bin/` 或 `~/.local/bin/`
+- **GitHub Copilot CLI**: npm 全局目录（通常为 `~/.nvm/versions/node/<version>/bin/`）
 - **Codex**: npm/bun 全局目录
 - **Spec Kit**: `~/.local/bin/`
+
+#### Q: GitHub Copilot CLI 有什么特殊要求？
+
+A: GitHub Copilot CLI 有以下特殊要求：
+
+**Node.js 版本要求**:
+- 需要 Node.js 22 或更高版本
+- 如果您的 Node.js 版本过低，请先升级：
+  ```bash
+  nvm install 22
+  nvm use 22
+  ```
+
+**平台限制**:
+- ✅ 支持 macOS（ARM64 和 x86_64）
+- ✅ 支持 Linux（x86_64）
+- ❌ 不支持 Windows
+
+**安装方式**:
+- 通过 npm 全局安装：`npm install -g @github/copilot`
+- 安装后需要登录：`copilot auth login`
+
+**使用前准备**:
+1. 确保您有 GitHub Copilot 订阅（个人版或企业版）
+2. 安装完成后运行认证命令：
+   ```bash
+   copilot auth login
+   ```
+3. 按照提示在浏览器中完成 GitHub 认证
+
+**基本使用**:
+```bash
+# 获取命令建议
+copilot suggest "list all files"
+
+# 解释命令
+copilot explain "git rebase -i HEAD~3"
+
+# 交互式会话
+copilot
+```
+
+**配置示例**:
+```yaml
+tools:
+  node:
+    enabled: true
+    version: 22  # 或 lts（如果 LTS 版本 >= 22）
+  copilot-cli:
+    enabled: true
+```
+
+**常见问题**:
+- 如果安装失败，检查 Node.js 版本是否满足要求
+- 如果在不支持的平台上尝试安装，系统会返回错误信息
+- 如果认证失败，确保您有有效的 GitHub Copilot 订阅
+
+**升级**:
+```bash
+# 升级到最新版本
+mk upgrade copilot-cli
+
+# 或手动升级
+npm update -g @github/copilot
+```
 
 ### 平台相关
 

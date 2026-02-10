@@ -1,0 +1,54 @@
+# GitHub Copilot CLI 配置示例
+# 
+# 本文件展示了如何配置 mono-kickstart 以安装 GitHub Copilot CLI
+# 
+# 使用方法：
+#   mk init --config copilot-cli-config.yaml
+
+# 项目配置
+project:
+  name: my-project-with-copilot
+
+# 工具配置
+tools:
+  # NVM - Node.js 版本管理器（必需）
+  nvm:
+    enabled: true
+  
+  # Node.js - 必须是 22 或更高版本
+  node:
+    enabled: true
+    version: 22  # 可以是 22, lts（如果 >= 22）, latest, 或具体版本号如 22.1.0
+  
+  # GitHub Copilot CLI - AI 命令行助手
+  copilot-cli:
+    enabled: true
+  
+  # 其他工具（可选）
+  bun:
+    enabled: true
+  
+  uv:
+    enabled: true
+  
+  claude-code:
+    enabled: true
+  
+  codex:
+    enabled: false  # 如果不需要可以禁用
+  
+  spec-kit:
+    enabled: true
+  
+  bmad-method:
+    enabled: true
+
+# 镜像源配置（中国大陆加速）
+registry:
+  npm: https://registry.npmmirror.com/
+  pypi: https://mirrors.sustech.edu.cn/pypi/web/simple
+
+# 安装后步骤：
+# 1. 验证安装：copilot --version
+# 2. 登录 GitHub：copilot auth login
+# 3. 开始使用：copilot suggest "your command"

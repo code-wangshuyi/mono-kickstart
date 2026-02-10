@@ -20,6 +20,7 @@ from .installers.bun_installer import BunInstaller
 from .installers.claude_installer import ClaudeCodeInstaller
 from .installers.codex_installer import CodexInstaller
 from .installers.conda_installer import CondaInstaller
+from .installers.copilot_installer import CopilotCLIInstaller
 from .installers.npx_installer import NpxInstaller
 from .installers.node_installer import NodeInstaller
 from .installers.nvm_installer import NVMInstaller
@@ -39,10 +40,11 @@ INSTALL_ORDER = [
     "bun",           # 4. 安装 Bun（需要 Node.js 作为备选）
     "uv",            # 5. 安装 uv
     "claude-code",   # 6. 安装 Claude Code CLI
-    "codex",         # 7. 安装 Codex CLI（可能依赖 Bun）
-    "npx",           # 8. 安装 npx（依赖 Node.js/npm）
-    "spec-kit",      # 9. 安装 Spec Kit（依赖 uv）
-    "bmad-method",   # 10. 安装 BMad Method（依赖 Node.js/Bun/npx）
+    "copilot-cli",   # 7. 安装 GitHub Copilot CLI（依赖 Node.js 22+）
+    "codex",         # 8. 安装 Codex CLI（可能依赖 Bun）
+    "npx",           # 9. 安装 npx（依赖 Node.js/npm）
+    "spec-kit",      # 10. 安装 Spec Kit（依赖 uv）
+    "bmad-method",   # 11. 安装 BMad Method（依赖 Node.js/Bun/npx）
 ]
 
 
@@ -113,6 +115,7 @@ class InstallOrchestrator:
             "bun": BunInstaller,
             "uv": UVInstaller,
             "claude-code": ClaudeCodeInstaller,
+            "copilot-cli": CopilotCLIInstaller,
             "codex": CodexInstaller,
             "npx": NpxInstaller,
             "spec-kit": SpecKitInstaller,
