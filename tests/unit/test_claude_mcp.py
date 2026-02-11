@@ -596,3 +596,112 @@ class TestClaudeMode:
         config = json.loads(settings_file.read_text())
         assert config["permissions"]["allow"] == ALLOW_ALL_PERMISSIONS
         assert config["permissionMode"] == "plan"
+
+
+class TestClaudeOffSuggestion:
+    """Tests for --off suggestion feature toggle"""
+
+    def test_parse_off_suggestion(self):
+        """Test parsing --off suggestion"""
+        parser = create_parser()
+        args = parser.parse_args(['claude', '--off', 'suggestion'])
+        assert args.command == 'claude'
+        assert args.off == 'suggestion'
+
+    def test_invalid_off_value(self):
+        """Test invalid --off value is rejected"""
+        parser = create_parser()
+        with pytest.raises(SystemExit) as exc_info:
+            parser.parse_args(['claude', '--off', 'invalid'])
+        assert exc_info.value.code == 2
+
+    def test_off_suggestion_creates_config(self, tmp_path, monkeypatch):
+        """Test --off suggestion sets promptSuggestionEnabled to false"""
+        monkeypatch.chdir(tmp_path)
+
+        parser = create_parser()
+        args = parser.parse_args(['claude', '--off', 'suggestion'])
+        result = cmd_claude(args)
+
+        assert result == 0
+
+        settings_file = tmp_path / ".claude" / "settings.local.json"
+        assert settings_file.exists()
+
+        config = json.loads(settings_file.read_text())
+        assert config["promptSuggestionEnabled"] is False
+
+    def test_off_suggestion_merges_with_existing(self, tmp_path, monkeypatch):
+        """Test --off suggestion preserves existing config"""
+        monkeypatch.chdir(tmp_path)
+
+        claude_dir = tmp_path / ".claude"
+        claude_dir.mkdir()
+        existing = {
+            "mcpServers": {
+                "chrome-devtools": {
+                    "command": "npx",
+                    "args": ["chrome-devtools-mcp@latest"]
+                }
+            },
+            "permissions": {
+                "allow": ["Bash(*)"]
+            }
+        }
+        (claude_dir / "settings.local.json").write_text(json.dumps(existing))
+
+        parser = create_parser()
+        args = parser.parse_args(['claude', '--off', 'suggestion'])
+        result = cmd_claude(args)
+
+        assert result == 0
+
+        config = json.loads((claude_dir / "settings.local.json").read_text())
+        assert "mcpServers" in config
+        assert "chrome-devtools" in config["mcpServers"]
+        assert config["permissions"]["allow"] == ["Bash(*)"]
+        assert config["promptSuggestionEnabled"] is False
+
+    def test_off_suggestion_dry_run(self, tmp_path, monkeypatch):
+        """Test --off suggestion --dry-run does not write file"""
+        monkeypatch.chdir(tmp_path)
+
+        parser = create_parser()
+        args = parser.parse_args(['claude', '--off', 'suggestion', '--dry-run'])
+        result = cmd_claude(args)
+
+        assert result == 0
+        settings_file = tmp_path / ".claude" / "settings.local.json"
+        assert not settings_file.exists()
+
+    def test_off_suggestion_with_allow_all(self, tmp_path, monkeypatch):
+        """Test --off suggestion --allow all configures both"""
+        monkeypatch.chdir(tmp_path)
+
+        parser = create_parser()
+        args = parser.parse_args(['claude', '--off', 'suggestion', '--allow', 'all'])
+        result = cmd_claude(args)
+
+        assert result == 0
+
+        settings_file = tmp_path / ".claude" / "settings.local.json"
+        config = json.loads(settings_file.read_text())
+        assert config["permissions"]["allow"] == ALLOW_ALL_PERMISSIONS
+        assert config["promptSuggestionEnabled"] is False
+
+    def test_off_suggestion_handles_corrupt_json(self, tmp_path, monkeypatch):
+        """Test --off suggestion handles corrupt settings.local.json"""
+        monkeypatch.chdir(tmp_path)
+
+        claude_dir = tmp_path / ".claude"
+        claude_dir.mkdir()
+        (claude_dir / "settings.local.json").write_text("not valid json{{{")
+
+        parser = create_parser()
+        args = parser.parse_args(['claude', '--off', 'suggestion'])
+        result = cmd_claude(args)
+
+        assert result == 0
+
+        config = json.loads((claude_dir / "settings.local.json").read_text())
+        assert config["promptSuggestionEnabled"] is False

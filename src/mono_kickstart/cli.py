@@ -63,6 +63,9 @@ ALLOW_ALL_PERMISSIONS = [
 # --mode 可选值
 MODE_CHOICES = ["plan"]
 
+# --off 可选值
+OFF_CHOICES = ["suggestion"]
+
 MCP_SERVER_CONFIGS = {
     "chrome": {
         "name": "chrome-devtools",
@@ -397,7 +400,7 @@ def create_parser() -> argparse.ArgumentParser:
         'claude',
         help='配置 Claude Code 项目设置（MCP 服务器等）',
         description='为当前项目配置 Claude Code 设置\n\n'
-                    '支持配置 MCP (Model Context Protocol) 服务器和权限，\n'
+                    '支持配置 MCP (Model Context Protocol) 服务器、权限和功能开关，\n'
                     '将配置写入当前目录的 .claude/settings.local.json。',
         formatter_class=ChineseHelpFormatter,
         epilog='示例:\n'
@@ -406,6 +409,7 @@ def create_parser() -> argparse.ArgumentParser:
                '  mk claude --mode plan                默认以 plan 模式运行\n'
                '  mk claude --allow all --mode plan    同时配置权限和模式\n'
                '  mk claude --allow all --mcp chrome   同时配置权限和 MCP\n'
+               '  mk claude --off suggestion             关闭提示建议功能\n'
                '  mk claude --allow all --dry-run      模拟运行，查看将写入的配置',
     )
     claude_parser.add_argument(
@@ -428,6 +432,13 @@ def create_parser() -> argparse.ArgumentParser:
         choices=MODE_CHOICES,
         metavar='MODE',
         help=f'设置权限模式 (可选值: {", ".join(MODE_CHOICES)})'
+    )
+    claude_parser.add_argument(
+        '--off',
+        type=str,
+        choices=OFF_CHOICES,
+        metavar='FEATURE',
+        help=f'关闭指定功能 (可选值: {", ".join(OFF_CHOICES)})'
     )
     claude_parser.add_argument(
         '--dry-run',
@@ -1583,8 +1594,8 @@ def cmd_claude(args: argparse.Namespace) -> int:
         退出码（0 表示成功）
     """
     # 验证: 至少需要一个操作
-    if not args.mcp and not args.allow and not args.mode:
-        logger.error("❌ 错误: 请指定要配置的内容（如 --mcp chrome、--allow all 或 --mode plan）")
+    if not args.mcp and not args.allow and not args.mode and not args.off:
+        logger.error("❌ 错误: 请指定要配置的内容（如 --mcp chrome、--allow all、--mode plan 或 --off suggestion）")
         logger.info("💡 提示: 使用 mk claude --help 查看可用选项")
         return 1
 
@@ -1608,6 +1619,11 @@ def cmd_claude(args: argparse.Namespace) -> int:
 
         if args.mode:
             result = _claude_set_mode(args.mode, args.dry_run)
+            if result != 0:
+                return result
+
+        if args.off:
+            result = _claude_set_off(args.off, args.dry_run)
             if result != 0:
                 return result
 
@@ -1818,6 +1834,75 @@ def _claude_set_mode(mode: str, dry_run: bool) -> int:
     logger.info(f"✓ 模式: 已配置 permissionMode = {mode}")
     logger.info("============================================================")
     logger.info("✨ Claude Code 模式配置完成！")
+    return 0
+
+
+def _claude_set_off(feature: str, dry_run: bool) -> int:
+    """关闭指定功能
+
+    根据 feature 设置对应的配置项为 false，写入 .claude/settings.local.json。
+
+    Args:
+        feature: 功能标识（如 suggestion）
+        dry_run: 是否模拟运行
+
+    Returns:
+        退出码（0 表示成功）
+    """
+    # 功能映射
+    feature_map = {
+        "suggestion": {
+            "key": "promptSuggestionEnabled",
+            "display_name": "提示建议",
+        },
+    }
+
+    info = feature_map[feature]
+    config_key = info["key"]
+    display_name = info["display_name"]
+
+    logger.info(f"📋 [功能] 关闭{display_name}...")
+
+    # 目标文件
+    claude_dir = Path(".claude")
+    settings_file = claude_dir / "settings.local.json"
+
+    # 读取现有配置
+    existing_config = {}
+    if settings_file.exists():
+        try:
+            existing_config = json.loads(settings_file.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as e:
+            logger.warning(f"⚠️  读取现有配置失败，将创建新配置: {e}")
+
+    existing_config[config_key] = False
+
+    if dry_run:
+        logger.info(f"  [模拟运行] 将写入 {settings_file}:")
+        logger.info(f"  {json.dumps({config_key: False}, indent=2)}")
+        logger.info("")
+        logger.info("============================================================")
+        logger.info(f"○ [模拟运行] 功能: 将关闭{display_name} ({config_key} = false)")
+        logger.info("============================================================")
+        logger.info("✨ 模拟运行完成，未实际写入任何配置。")
+        return 0
+
+    # 创建 .claude 目录
+    claude_dir.mkdir(parents=True, exist_ok=True)
+
+    # 写入配置
+    settings_file.write_text(
+        json.dumps(existing_config, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8"
+    )
+
+    logger.info(f"✓ 功能配置已写入 {settings_file}")
+    logger.info(f"  {config_key} = false")
+    logger.info("")
+    logger.info("============================================================")
+    logger.info(f"✓ 功能: 已关闭{display_name} ({config_key} = false)")
+    logger.info("============================================================")
+    logger.info("✨ Claude Code 功能配置完成！")
     return 0
 
 
