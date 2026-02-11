@@ -481,6 +481,7 @@ class TestDetectAllTools:
              patch.object(detector, 'detect_conda') as mock_conda, \
              patch.object(detector, 'detect_bun') as mock_bun, \
              patch.object(detector, 'detect_uv') as mock_uv, \
+             patch.object(detector, 'detect_gh') as mock_gh, \
              patch.object(detector, 'detect_claude_code') as mock_claude, \
              patch.object(detector, 'detect_codex') as mock_codex, \
              patch.object(detector, 'detect_npx') as mock_npx, \
@@ -494,6 +495,7 @@ class TestDetectAllTools:
             mock_conda.return_value = ToolStatus("conda", False)
             mock_bun.return_value = ToolStatus("bun", True, "1.0.25", "/usr/local/bin/bun")
             mock_uv.return_value = ToolStatus("uv", False)
+            mock_gh.return_value = ToolStatus("gh", False)
             mock_claude.return_value = ToolStatus("claude-code", False)
             mock_codex.return_value = ToolStatus("codex", False)
             mock_npx.return_value = ToolStatus("npx", False)
@@ -505,12 +507,13 @@ class TestDetectAllTools:
             result = detector.detect_all_tools()
 
             # Verify all tools are in result
-            assert len(result) == 11
+            assert len(result) == 12
             assert "nvm" in result
             assert "node" in result
             assert "conda" in result
             assert "bun" in result
             assert "uv" in result
+            assert "gh" in result
             assert "claude-code" in result
             assert "codex" in result
             assert "npx" in result
@@ -532,6 +535,7 @@ class TestDetectAllTools:
              patch.object(detector, 'detect_conda') as mock_conda, \
              patch.object(detector, 'detect_bun') as mock_bun, \
              patch.object(detector, 'detect_uv') as mock_uv, \
+             patch.object(detector, 'detect_gh') as mock_gh, \
              patch.object(detector, 'detect_claude_code') as mock_claude, \
              patch.object(detector, 'detect_codex') as mock_codex, \
              patch.object(detector, 'detect_npx') as mock_npx, \
@@ -540,7 +544,7 @@ class TestDetectAllTools:
              patch.object(detector, 'detect_bmad') as mock_bmad:
 
             # Set default return values
-            for mock in [mock_nvm, mock_node, mock_conda, mock_bun, mock_uv,
+            for mock in [mock_nvm, mock_node, mock_conda, mock_bun, mock_uv, mock_gh,
                         mock_claude, mock_codex, mock_npx, mock_uipro, mock_spec, mock_bmad]:
                 mock.return_value = ToolStatus("tool", False)
 
@@ -553,6 +557,7 @@ class TestDetectAllTools:
             mock_conda.assert_called_once()
             mock_bun.assert_called_once()
             mock_uv.assert_called_once()
+            mock_gh.assert_called_once()
             mock_claude.assert_called_once()
             mock_codex.assert_called_once()
             mock_npx.assert_called_once()
@@ -567,6 +572,7 @@ class TestDetectAllTools:
              patch.object(detector, 'detect_conda', return_value=ToolStatus("conda", False)), \
              patch.object(detector, 'detect_bun', return_value=ToolStatus("bun", False)), \
              patch.object(detector, 'detect_uv', return_value=ToolStatus("uv", True, "0.1.5")), \
+             patch.object(detector, 'detect_gh', return_value=ToolStatus("gh", False)), \
              patch.object(detector, 'detect_claude_code', return_value=ToolStatus("claude-code", False)), \
              patch.object(detector, 'detect_codex', return_value=ToolStatus("codex", False)), \
              patch.object(detector, 'detect_npx', return_value=ToolStatus("npx", True, "10.0.0")), \
@@ -581,7 +587,7 @@ class TestDetectAllTools:
             not_installed_count = sum(1 for status in result.values() if not status.installed)
 
             assert installed_count == 5  # nvm, node, uv, npx, spec-kit
-            assert not_installed_count == 6  # conda, bun, claude-code, codex, uipro, bmad-method
+            assert not_installed_count == 7  # conda, bun, gh, claude-code, codex, uipro, bmad-method
 
 
 class TestPipDetection:

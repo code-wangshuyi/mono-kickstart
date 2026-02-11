@@ -310,6 +310,25 @@ class ToolDetector:
             path=path
         )
 
+    def detect_gh(self) -> ToolStatus:
+        """检测 GitHub CLI
+
+        Returns:
+            ToolStatus: GitHub CLI 的状态信息
+        """
+        if not self.is_command_available("gh"):
+            return ToolStatus(name="gh", installed=False)
+
+        version = self.get_command_version("gh", "--version")
+        path = shutil.which("gh")
+
+        return ToolStatus(
+            name="gh",
+            installed=True,
+            version=version,
+            path=path
+        )
+
     def detect_bmad(self) -> ToolStatus:
         """检测 BMad Method
         
@@ -385,6 +404,7 @@ class ToolDetector:
             "conda": self.detect_conda(),
             "bun": self.detect_bun(),
             "uv": self.detect_uv(),
+            "gh": self.detect_gh(),
             "claude-code": self.detect_claude_code(),
             "codex": self.detect_codex(),
             "npx": self.detect_npx(),

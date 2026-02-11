@@ -34,6 +34,7 @@ AVAILABLE_TOOLS = [
     "conda",
     "bun",
     "uv",
+    "gh",
     "claude-code",
     "codex",
     "npx",
