@@ -168,16 +168,28 @@ class TestCompletionScriptContent:
     def test_bash_script_claude_has_skills(self):
         """Test bash script includes --skills for claude subcommand"""
         assert "--skills" in BASH_COMPLETION_SCRIPT
+        assert "--plugin" in BASH_COMPLETION_SCRIPT
         assert "uipro" in BASH_COMPLETION_SCRIPT
+        assert "omc" in BASH_COMPLETION_SCRIPT
 
     def test_zsh_script_claude_has_skills(self):
         """Test zsh script includes --skills for claude subcommand"""
         assert "--skills" in ZSH_COMPLETION_SCRIPT
+        assert "--plugin" in ZSH_COMPLETION_SCRIPT
         assert "uipro" in ZSH_COMPLETION_SCRIPT
+        assert "omc" in ZSH_COMPLETION_SCRIPT
 
     def test_fish_script_claude_has_skills(self):
         """Test fish script includes skills for claude subcommand"""
         assert "skills" in FISH_COMPLETION_SCRIPT
+        assert "plugin" in FISH_COMPLETION_SCRIPT
+        assert "omc" in FISH_COMPLETION_SCRIPT
+
+    def test_opencode_plugin_completion(self):
+        assert "--plugin" in BASH_COMPLETION_SCRIPT
+        assert "--plugin" in ZSH_COMPLETION_SCRIPT
+        assert "-l plugin" in FISH_COMPLETION_SCRIPT
+        assert "omo" in BASH_COMPLETION_SCRIPT
 
     def test_all_scripts_support_both_commands(self):
         """Test all scripts support both mk and mono-kickstart"""

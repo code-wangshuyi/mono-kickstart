@@ -81,6 +81,9 @@ OFF_CHOICES = ["suggestion"]
 # --skills 可选值
 SKILL_CHOICES = ["uipro"]
 
+PLUGIN_CHOICES = ["omc"]
+OPENCODE_PLUGIN_CHOICES = ["omo"]
+
 # Skill 配置注册表
 SKILL_CONFIGS = {
     "uipro": {
@@ -381,7 +384,7 @@ def create_parser() -> argparse.ArgumentParser:
         "claude",
         help="配置 Claude Code 项目设置（MCP 服务器等）",
         description="为当前项目配置 Claude Code 设置\n\n"
-        "支持配置 MCP (Model Context Protocol) 服务器、权限、功能开关和技能包，\n"
+        "支持配置 MCP (Model Context Protocol) 服务器、权限、功能开关、技能包和插件，\n"
         "将配置写入当前目录的 .claude/ 目录。",
         formatter_class=ChineseHelpFormatter,
         epilog="示例:\n"
@@ -392,6 +395,7 @@ def create_parser() -> argparse.ArgumentParser:
         "  mk claude --allow all --mcp chrome   同时配置权限和 MCP\n"
         "  mk claude --off suggestion             关闭提示建议功能\n"
         "  mk claude --skills uipro              安装 UIPro 设计技能包\n"
+        "  mk claude --plugin omc               安装并配置 Oh My Claude Code\n"
         "  mk claude --allow all --dry-run      模拟运行，查看将写入的配置",
     )
     claude_parser.add_argument(
@@ -429,24 +433,32 @@ def create_parser() -> argparse.ArgumentParser:
         metavar="SKILL",
         help=f"安装 Claude Code 技能包 (可选值: {', '.join(SKILL_CHOICES)})",
     )
+    claude_parser.add_argument(
+        "--plugin",
+        type=str,
+        choices=PLUGIN_CHOICES,
+        metavar="PLUGIN",
+        help=f"安装 Claude Code 插件 (可选值: {', '.join(PLUGIN_CHOICES)})",
+    )
     claude_parser.add_argument("--dry-run", action="store_true", help="模拟运行，不实际写入配置")
 
     opencode_parser = subparsers.add_parser(
         "opencode",
         help="配置 OpenCode 扩展能力",
-        description="配置 OpenCode 扩展能力",
+        description="配置 OpenCode 扩展能力\n\n支持安装插件并写入当前项目配置。",
         formatter_class=ChineseHelpFormatter,
+        epilog="示例:\n"
+        "  mk opencode --plugin omo            安装并配置 Oh My OpenCode\n"
+        "  mk opencode --plugin omo --dry-run  模拟运行，查看将执行的操作",
     )
-    opencode_subparsers = opencode_parser.add_subparsers(
-        title="OpenCode 操作", dest="opencode_action", help="OpenCode 子命令帮助信息"
+    opencode_parser.add_argument(
+        "--plugin",
+        type=str,
+        choices=OPENCODE_PLUGIN_CHOICES,
+        metavar="PLUGIN",
+        help=f"安装 OpenCode 插件 (可选值: {', '.join(OPENCODE_PLUGIN_CHOICES)})",
     )
-    opencode_omo_parser = opencode_subparsers.add_parser(
-        "omo",
-        help="安装 Oh My OpenCode 插件并写入配置",
-        description="安装 Oh My OpenCode 插件并写入配置",
-        formatter_class=ChineseHelpFormatter,
-    )
-    opencode_omo_parser.add_argument("--dry-run", action="store_true", help="模拟运行，不实际执行")
+    opencode_parser.add_argument("--dry-run", action="store_true", help="模拟运行，不实际执行")
 
     return parser
 
@@ -1750,10 +1762,17 @@ def cmd_claude(args: argparse.Namespace) -> int:
         退出码（0 表示成功）
     """
     # 验证: 至少需要一个操作
-    if not args.mcp and not args.allow and not args.mode and not args.off and not args.skills:
+    if (
+        not args.mcp
+        and not args.allow
+        and not args.mode
+        and not args.off
+        and not args.skills
+        and not args.plugin
+    ):
         logger.error(
             "❌ 错误: 请指定要配置的内容"
-            "（如 --mcp chrome、--allow all、--mode plan、--off suggestion 或 --skills uipro）"
+            "（如 --mcp chrome、--allow all、--mode plan、--off suggestion、--skills uipro 或 --plugin omc）"
         )
         logger.info("💡 提示: 使用 mk claude --help 查看可用选项")
         return 1
@@ -1788,6 +1807,11 @@ def cmd_claude(args: argparse.Namespace) -> int:
 
         if args.skills:
             result = _claude_add_skill(args.skills, args.dry_run)
+            if result != 0:
+                return result
+
+        if args.plugin:
+            result = _claude_add_plugin(args.plugin, args.dry_run)
             if result != 0:
                 return result
 
@@ -2146,13 +2170,78 @@ def _claude_add_skill(skill_key: str, dry_run: bool) -> int:
     return 0
 
 
-def cmd_opencode(args: argparse.Namespace) -> int:
-    if getattr(args, "opencode_action", None) is None:
-        parser = create_parser()
-        parser.parse_args(["opencode", "--help"])
+def _claude_add_plugin(plugin_key: str, dry_run: bool) -> int:
+    if plugin_key != "omc":
+        logger.error(f"❌ 不支持的插件: {plugin_key}")
+        return 1
+
+    logger.info("📋 [插件] 安装 Oh My Claude Code (OMC)...")
+
+    if not shutil.which("claude"):
+        logger.error("❌ 未检测到 claude 命令")
+        logger.info("💡 提示: 请先运行 'mk install claude-code' 安装 Claude Code CLI")
+        return 1
+
+    marketplace_cmd = (
+        "claude /plugin marketplace add https://github.com/Yeachan-Heo/oh-my-claudecode"
+    )
+    install_cmd = "claude /plugin install oh-my-claudecode"
+    config_url = (
+        "https://raw.githubusercontent.com/Yeachan-Heo/oh-my-claudecode/main/docs/CLAUDE.md"
+    )
+    claude_md_file = Path(".claude") / "CLAUDE.md"
+    download_cmd = f"curl -fsSL {config_url} -o {claude_md_file}"
+
+    if dry_run:
+        logger.info(f"  [模拟运行] 将执行: {marketplace_cmd}")
+        logger.info(f"  [模拟运行] 将执行: {install_cmd}")
+        logger.info(f"  [模拟运行] 将执行: {download_cmd}")
+        logger.info(f"  [模拟运行] 将写入: {claude_md_file}")
+        logger.info("")
+        logger.info("============================================================")
+        logger.info("○ OMC: [模拟运行] 将安装并配置插件")
+        logger.info("============================================================")
+        logger.info("✨ 模拟运行完成，未实际执行任何操作。")
         return 0
 
-    if args.opencode_action == "omo":
+    result = subprocess.run(marketplace_cmd, shell=True, capture_output=True, text=True, timeout=60)
+    if result.returncode != 0:
+        logger.error("❌ 添加 OMC 插件源失败")
+        if result.stderr:
+            logger.error(f"  错误信息: {result.stderr.strip()}")
+        return 1
+
+    result = subprocess.run(install_cmd, shell=True, capture_output=True, text=True, timeout=60)
+    if result.returncode != 0:
+        logger.error("❌ 安装 OMC 插件失败")
+        if result.stderr:
+            logger.error(f"  错误信息: {result.stderr.strip()}")
+        return 1
+
+    claude_md_file.parent.mkdir(parents=True, exist_ok=True)
+    result = subprocess.run(download_cmd, shell=True, capture_output=True, text=True, timeout=60)
+    if result.returncode != 0:
+        logger.error("❌ 下载 OMC 项目配置模板失败")
+        if result.stderr:
+            logger.error(f"  错误信息: {result.stderr.strip()}")
+        return 1
+
+    logger.info(f"✓ OMC 配置已写入 {claude_md_file}")
+    logger.info("")
+    logger.info("============================================================")
+    logger.info("✓ OMC: 插件安装与项目配置完成")
+    logger.info("============================================================")
+    logger.info("✨ Claude Code 插件配置完成！")
+    return 0
+
+
+def cmd_opencode(args: argparse.Namespace) -> int:
+    if not args.plugin:
+        logger.error("❌ 错误: 请指定要安装的插件（如 --plugin omo）")
+        logger.info("💡 提示: 使用 mk opencode --help 查看可用选项")
+        return 1
+
+    if args.plugin == "omo":
         return _opencode_install_omo(args.dry_run)
 
     return 0

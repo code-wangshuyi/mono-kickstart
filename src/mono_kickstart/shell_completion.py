@@ -84,17 +84,19 @@ _mk_completion() {
                 COMPREPLY=( $(compgen -W "suggestion" -- ${cur}) )
             elif [[ ${prev} == "--skills" ]]; then
                 COMPREPLY=( $(compgen -W "uipro" -- ${cur}) )
+            elif [[ ${prev} == "--plugin" ]]; then
+                COMPREPLY=( $(compgen -W "omc" -- ${cur}) )
             else
-                local claude_opts="--mcp --allow --mode --off --skills --dry-run --help"
+                local claude_opts="--mcp --allow --mode --off --skills --plugin --dry-run --help"
                 COMPREPLY=( $(compgen -W "${claude_opts}" -- ${cur}) )
             fi
             ;;
         opencode)
-            if [ $COMP_CWORD -eq 2 ]; then
+            if [[ ${prev} == "--plugin" ]]; then
                 COMPREPLY=( $(compgen -W "omo" -- ${cur}) )
-            elif [ $COMP_CWORD -ge 3 ] && [ "${COMP_WORDS[2]}" = "omo" ]; then
-                local omo_opts="--dry-run --help"
-                COMPREPLY=( $(compgen -W "${omo_opts}" -- ${cur}) )
+            else
+                local opencode_opts="--plugin --dry-run --help"
+                COMPREPLY=( $(compgen -W "${opencode_opts}" -- ${cur}) )
             fi
             ;;
         config)
@@ -231,18 +233,15 @@ _mk() {
                         '--mode[设置权限模式]:mode:(plan)' \
                         '--off[禁用指定功能]:feature:(suggestion)' \
                         '--skills[安装 Claude Code 技能包]:skill:(uipro)' \
+                        '--plugin[安装 Claude Code 插件]:plugin:(omc)' \
                         '--dry-run[模拟运行，不实际写入配置]' \
                         '--help[显示帮助信息]'
                     ;;
                 opencode)
-                    _arguments -C \
-                        '1:action:(omo)' \
-                        '*:: :->opencode_args'
-                    if [[ $words[2] == "omo" ]]; then
-                        _arguments \
-                            '--dry-run[模拟运行，不实际执行]' \
-                            '--help[显示帮助信息]'
-                    fi
+                    _arguments \
+                        '--plugin[安装 OpenCode 插件]:plugin:(omo)' \
+                        '--dry-run[模拟运行，不实际执行]' \
+                        '--help[显示帮助信息]'
                     ;;
                 config)
                     local -a config_actions mirror_actions mirror_tools
@@ -369,11 +368,12 @@ complete -c mk -f -n "__fish_seen_subcommand_from claude" -l allow -d "配置权
 complete -c mk -f -n "__fish_seen_subcommand_from claude" -l mode -d "设置权限模式" -a "plan"
 complete -c mk -f -n "__fish_seen_subcommand_from claude" -l off -d "禁用指定功能" -a "suggestion"
 complete -c mk -f -n "__fish_seen_subcommand_from claude" -l skills -d "安装 Claude Code 技能包" -a "uipro"
+complete -c mk -f -n "__fish_seen_subcommand_from claude" -l plugin -d "安装 Claude Code 插件" -a "omc"
 complete -c mk -f -n "__fish_seen_subcommand_from claude" -l dry-run -d "模拟运行"
 
 # opencode 命令
-complete -c mk -f -n "__fish_seen_subcommand_from opencode; and not __fish_seen_subcommand_from omo" -a "omo" -d "安装 Oh My OpenCode 插件并写入配置"
-complete -c mk -f -n "__fish_seen_subcommand_from omo" -l dry-run -d "模拟运行"
+complete -c mk -f -n "__fish_seen_subcommand_from opencode" -l plugin -d "安装 OpenCode 插件" -a "omo"
+complete -c mk -f -n "__fish_seen_subcommand_from opencode" -l dry-run -d "模拟运行"
 
 # config mirror reset --tool
 complete -c mk -f -n "__fish_seen_subcommand_from reset" -l tool -d "指定工具" -a "npm bun pip uv conda"

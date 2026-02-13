@@ -78,6 +78,7 @@ def test_opencode_help():
             assert exc_info.value.code == 0
             output = fake_out.getvalue()
             assert "配置 OpenCode 扩展能力" in output
+            assert "--plugin" in output
             assert "omo" in output
 
 
@@ -139,7 +140,7 @@ def test_opencode_omo_dry_run_success(tmp_path, monkeypatch):
             "bunx": "/usr/local/bin/bunx",
         }.get(cmd)
         with patch("mono_kickstart.cli.subprocess.run") as mock_run:
-            with patch("sys.argv", ["mk", "opencode", "omo", "--dry-run"]):
+            with patch("sys.argv", ["mk", "opencode", "--plugin", "omo", "--dry-run"]):
                 exit_code = main()
     assert exit_code == 0
     mock_run.assert_not_called()
@@ -148,8 +149,15 @@ def test_opencode_omo_dry_run_success(tmp_path, monkeypatch):
 def test_opencode_omo_requires_opencode(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     with patch("mono_kickstart.cli.shutil.which", return_value=None):
-        with patch("sys.argv", ["mk", "opencode", "omo"]):
+        with patch("sys.argv", ["mk", "opencode", "--plugin", "omo"]):
             exit_code = main()
+    assert exit_code == 1
+
+
+def test_opencode_requires_plugin_option(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    with patch("sys.argv", ["mk", "opencode"]):
+        exit_code = main()
     assert exit_code == 1
 
 
@@ -168,7 +176,7 @@ def test_opencode_omo_writes_config_files(tmp_path, monkeypatch):
         }.get(cmd)
         with patch("mono_kickstart.cli.subprocess.run") as mock_run:
             mock_run.return_value.returncode = 0
-            with patch("sys.argv", ["mk", "opencode", "omo"]):
+            with patch("sys.argv", ["mk", "opencode", "--plugin", "omo"]):
                 exit_code = main()
 
     assert exit_code == 0
