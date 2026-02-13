@@ -11,6 +11,7 @@ from .uv_installer import UVInstaller
 from .claude_installer import ClaudeCodeInstaller
 from .copilot_installer import CopilotCLIInstaller
 from .codex_installer import CodexInstaller
+from .opencode_installer import OpenCodeInstaller
 from .npx_installer import NpxInstaller
 from .spec_kit_installer import SpecKitInstaller
 from .bmad_installer import BMadInstaller
@@ -24,6 +25,7 @@ __all__ = [
     "ClaudeCodeInstaller",
     "CopilotCLIInstaller",
     "CodexInstaller",
+    "OpenCodeInstaller",
     "NpxInstaller",
     "SpecKitInstaller",
     "BMadInstaller",
