@@ -75,8 +75,11 @@ ALLOW_ALL_PERMISSIONS = [
 # --mode 可选值
 MODE_CHOICES = ["plan"]
 
+# --on 可选值
+ON_CHOICES = ["team"]
+
 # --off 可选值
-OFF_CHOICES = ["suggestion"]
+OFF_CHOICES = ["suggestion", "team"]
 
 # --skills 可选值
 SKILL_CHOICES = ["uipro"]
@@ -393,6 +396,8 @@ def create_parser() -> argparse.ArgumentParser:
         "  mk claude --mode plan                默认以 plan 模式运行\n"
         "  mk claude --allow all --mode plan    同时配置权限和模式\n"
         "  mk claude --allow all --mcp chrome   同时配置权限和 MCP\n"
+        "  mk claude --on team                  启用实验性团队功能\n"
+        "  mk claude --off team                 禁用实验性团队功能\n"
         "  mk claude --off suggestion             关闭提示建议功能\n"
         "  mk claude --skills uipro              安装 UIPro 设计技能包\n"
         "  mk claude --plugin omc               安装并配置 Oh My Claude Code\n"
@@ -418,6 +423,13 @@ def create_parser() -> argparse.ArgumentParser:
         choices=MODE_CHOICES,
         metavar="MODE",
         help=f"设置权限模式 (可选值: {', '.join(MODE_CHOICES)})",
+    )
+    claude_parser.add_argument(
+        "--on",
+        type=str,
+        choices=ON_CHOICES,
+        metavar="FEATURE",
+        help=f"启用指定功能 (可选值: {', '.join(ON_CHOICES)})",
     )
     claude_parser.add_argument(
         "--off",
@@ -1766,13 +1778,15 @@ def cmd_claude(args: argparse.Namespace) -> int:
         not args.mcp
         and not args.allow
         and not args.mode
+        and not args.on
         and not args.off
         and not args.skills
         and not args.plugin
     ):
         logger.error(
             "❌ 错误: 请指定要配置的内容"
-            "（如 --mcp chrome、--allow all、--mode plan、--off suggestion、--skills uipro 或 --plugin omc）"
+            "（如 --mcp chrome、--allow all、--mode plan、--on team、--off suggestion/team、"
+            "--skills uipro 或 --plugin omc）"
         )
         logger.info("💡 提示: 使用 mk claude --help 查看可用选项")
         return 1
@@ -1797,6 +1811,11 @@ def cmd_claude(args: argparse.Namespace) -> int:
 
         if args.mode:
             result = _claude_set_mode(args.mode, args.dry_run)
+            if result != 0:
+                return result
+
+        if args.on:
+            result = _claude_set_on(args.on, args.dry_run)
             if result != 0:
                 return result
 
@@ -2025,10 +2044,10 @@ def _claude_set_mode(mode: str, dry_run: bool) -> int:
 def _claude_set_off(feature: str, dry_run: bool) -> int:
     """关闭指定功能
 
-    根据 feature 设置对应的配置项为 false，写入 .claude/settings.local.json。
+    根据 feature 类型，设置配置项为 false 或移除环境变量，写入 .claude/settings.local.json。
 
     Args:
-        feature: 功能标识（如 suggestion）
+        feature: 功能标识（如 suggestion、team）
         dry_run: 是否模拟运行
 
     Returns:
@@ -2037,12 +2056,20 @@ def _claude_set_off(feature: str, dry_run: bool) -> int:
     # 功能映射
     feature_map = {
         "suggestion": {
+            "type": "boolean",
             "key": "promptSuggestionEnabled",
             "display_name": "提示建议",
+        },
+        "team": {
+            "type": "env_var",
+            "key": "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS",
+            "display_name": "实验性团队",
+            "extra_settings": ["teammateMode"],
         },
     }
 
     info = feature_map[feature]
+    feature_type = info["type"]
     config_key = info["key"]
     display_name = info["display_name"]
 
@@ -2060,14 +2087,32 @@ def _claude_set_off(feature: str, dry_run: bool) -> int:
         except (json.JSONDecodeError, OSError) as e:
             logger.warning(f"⚠️  读取现有配置失败，将创建新配置: {e}")
 
-    existing_config[config_key] = False
+    if feature_type == "boolean":
+        existing_config[config_key] = False
+    elif feature_type == "env_var":
+        if "env" in existing_config and config_key in existing_config["env"]:
+            del existing_config["env"][config_key]
+            if not existing_config["env"]:
+                del existing_config["env"]
+        # 移除额外的顶层配置项
+        extra_keys = info.get("extra_settings", [])
+        for k in extra_keys:
+            existing_config.pop(k, None)
 
     if dry_run:
         logger.info(f"  [模拟运行] 将写入 {settings_file}:")
-        logger.info(f"  {json.dumps({config_key: False}, indent=2)}")
+        if feature_type == "boolean":
+            logger.info(f"  {json.dumps({config_key: False}, indent=2)}")
+        elif feature_type == "env_var":
+            logger.info(f"  移除环境变量: {config_key}")
+            for k in info.get("extra_settings", []):
+                logger.info(f"  移除配置项: {k}")
         logger.info("")
         logger.info("============================================================")
-        logger.info(f"○ [模拟运行] 功能: 将关闭{display_name} ({config_key} = false)")
+        if feature_type == "boolean":
+            logger.info(f"○ [模拟运行] 功能: 将关闭{display_name} ({config_key} = false)")
+        elif feature_type == "env_var":
+            logger.info(f"○ [模拟运行] 功能: 将关闭{display_name} (移除环境变量 {config_key})")
         logger.info("============================================================")
         logger.info("✨ 模拟运行完成，未实际写入任何配置。")
         return 0
@@ -2081,10 +2126,107 @@ def _claude_set_off(feature: str, dry_run: bool) -> int:
     )
 
     logger.info(f"✓ 功能配置已写入 {settings_file}")
-    logger.info(f"  {config_key} = false")
+    if feature_type == "boolean":
+        logger.info(f"  {config_key} = false")
+    elif feature_type == "env_var":
+        logger.info(f"  已移除环境变量: {config_key}")
+        for k in info.get("extra_settings", []):
+            logger.info(f"  已移除配置项: {k}")
     logger.info("")
     logger.info("============================================================")
-    logger.info(f"✓ 功能: 已关闭{display_name} ({config_key} = false)")
+    if feature_type == "boolean":
+        logger.info(f"✓ 功能: 已关闭{display_name} ({config_key} = false)")
+    elif feature_type == "env_var":
+        logger.info(f"✓ 功能: 已关闭{display_name} (已移除环境变量 {config_key})")
+    logger.info("============================================================")
+    logger.info("✨ Claude Code 功能配置完成！")
+    return 0
+
+
+def _claude_set_on(feature: str, dry_run: bool) -> int:
+    """启用指定功能
+
+    根据 feature 设置对应的环境变量，写入 .claude/settings.local.json。
+
+    Args:
+        feature: 功能标识（如 team）
+        dry_run: 是否模拟运行
+
+    Returns:
+        退出码（0 表示成功）
+    """
+    # 功能映射
+    feature_map = {
+        "team": {
+            "key": "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS",
+            "value": "1",
+            "display_name": "实验性团队",
+            "extra_settings": {"teammateMode": "auto"},
+        },
+    }
+
+    info = feature_map[feature]
+    config_key = info["key"]
+    config_value = info["value"]
+    display_name = info["display_name"]
+
+    logger.info(f"📋 [功能] 启用{display_name}...")
+
+    # 目标文件
+    claude_dir = Path(".claude")
+    settings_file = claude_dir / "settings.local.json"
+
+    # 读取现有配置
+    existing_config = {}
+    if settings_file.exists():
+        try:
+            existing_config = json.loads(settings_file.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as e:
+            logger.warning(f"⚠️  读取现有配置失败，将创建新配置: {e}")
+
+    # 确保 env 对象存在并设置环境变量
+    if "env" not in existing_config:
+        existing_config["env"] = {}
+    existing_config["env"][config_key] = config_value
+
+    # 设置额外的顶层配置项
+    extra_settings = info.get("extra_settings", {})
+    for k, v in extra_settings.items():
+        existing_config[k] = v
+
+    if dry_run:
+        logger.info(f"  [模拟运行] 将写入 {settings_file}:")
+        preview = {"env": {config_key: config_value}, **extra_settings}
+        logger.info(f"  {json.dumps(preview, indent=2)}")
+        logger.info("")
+        logger.info("============================================================")
+        logger.info(
+            f"○ [模拟运行] 功能: 将启用{display_name} "
+            f"(设置环境变量 {config_key} = {config_value})"
+        )
+        for k, v in extra_settings.items():
+            logger.info(f"○ [模拟运行] 功能: 将设置 {k} = {v}")
+        logger.info("============================================================")
+        logger.info("✨ 模拟运行完成，未实际写入任何配置。")
+        return 0
+
+    # 创建 .claude 目录
+    claude_dir.mkdir(parents=True, exist_ok=True)
+
+    # 写入配置
+    settings_file.write_text(
+        json.dumps(existing_config, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+
+    logger.info(f"✓ 功能配置已写入 {settings_file}")
+    logger.info(f"  已设置环境变量: {config_key} = {config_value}")
+    for k, v in extra_settings.items():
+        logger.info(f"  已设置: {k} = {v}")
+    logger.info("")
+    logger.info("============================================================")
+    logger.info(f"✓ 功能: 已启用{display_name} (环境变量 {config_key} = {config_value})")
+    for k, v in extra_settings.items():
+        logger.info(f"✓ 功能: 已设置 {k} = {v}")
     logger.info("============================================================")
     logger.info("✨ Claude Code 功能配置完成！")
     return 0

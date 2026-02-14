@@ -80,14 +80,16 @@ _mk_completion() {
                 COMPREPLY=( $(compgen -W "all" -- ${cur}) )
             elif [[ ${prev} == "--mode" ]]; then
                 COMPREPLY=( $(compgen -W "plan" -- ${cur}) )
+            elif [[ ${prev} == "--on" ]]; then
+                COMPREPLY=( $(compgen -W "team" -- ${cur}) )
             elif [[ ${prev} == "--off" ]]; then
-                COMPREPLY=( $(compgen -W "suggestion" -- ${cur}) )
+                COMPREPLY=( $(compgen -W "suggestion team" -- ${cur}) )
             elif [[ ${prev} == "--skills" ]]; then
                 COMPREPLY=( $(compgen -W "uipro" -- ${cur}) )
             elif [[ ${prev} == "--plugin" ]]; then
                 COMPREPLY=( $(compgen -W "omc" -- ${cur}) )
             else
-                local claude_opts="--mcp --allow --mode --off --skills --plugin --dry-run --help"
+                local claude_opts="--mcp --allow --mode --on --off --skills --plugin --dry-run --help"
                 COMPREPLY=( $(compgen -W "${claude_opts}" -- ${cur}) )
             fi
             ;;
@@ -231,7 +233,8 @@ _mk() {
                         '--mcp[添加 MCP 服务器配置]:server:(chrome context7)' \
                         '--allow[配置权限允许所有命令]:scope:(all)' \
                         '--mode[设置权限模式]:mode:(plan)' \
-                        '--off[禁用指定功能]:feature:(suggestion)' \
+                        '--on[启用指定功能]:feature:(team)' \
+                        '--off[禁用指定功能]:feature:(suggestion team)' \
                         '--skills[安装 Claude Code 技能包]:skill:(uipro)' \
                         '--plugin[安装 Claude Code 插件]:plugin:(omc)' \
                         '--dry-run[模拟运行，不实际写入配置]' \
@@ -366,7 +369,8 @@ complete -c mk -f -n "__fish_seen_subcommand_from dd" -l dry-run -d "模拟运�
 complete -c mk -f -n "__fish_seen_subcommand_from claude" -l mcp -d "添加 MCP 服务器配置" -a "chrome context7"
 complete -c mk -f -n "__fish_seen_subcommand_from claude" -l allow -d "配置权限允许所有命令" -a "all"
 complete -c mk -f -n "__fish_seen_subcommand_from claude" -l mode -d "设置权限模式" -a "plan"
-complete -c mk -f -n "__fish_seen_subcommand_from claude" -l off -d "禁用指定功能" -a "suggestion"
+complete -c mk -f -n "__fish_seen_subcommand_from claude" -l on -d "启用指定功能" -a "team"
+complete -c mk -f -n "__fish_seen_subcommand_from claude" -l off -d "禁用指定功能" -a "suggestion team"
 complete -c mk -f -n "__fish_seen_subcommand_from claude" -l skills -d "安装 Claude Code 技能包" -a "uipro"
 complete -c mk -f -n "__fish_seen_subcommand_from claude" -l plugin -d "安装 Claude Code 插件" -a "omc"
 complete -c mk -f -n "__fish_seen_subcommand_from claude" -l dry-run -d "模拟运行"

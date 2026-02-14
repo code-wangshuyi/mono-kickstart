@@ -705,3 +705,248 @@ class TestClaudeOffSuggestion:
 
         config = json.loads((claude_dir / "settings.local.json").read_text())
         assert config["promptSuggestionEnabled"] is False
+
+
+class TestClaudeOnTeam:
+    """Tests for --on team feature toggle"""
+
+    def test_parse_on_team(self):
+        """Test parsing --on team"""
+        parser = create_parser()
+        args = parser.parse_args(['claude', '--on', 'team'])
+        assert args.command == 'claude'
+        assert args.on == 'team'
+
+    def test_invalid_on_value(self):
+        """Test invalid --on value is rejected"""
+        parser = create_parser()
+        with pytest.raises(SystemExit) as exc_info:
+            parser.parse_args(['claude', '--on', 'invalid'])
+        assert exc_info.value.code == 2
+
+    def test_on_team_creates_config(self, tmp_path, monkeypatch):
+        """Test --on team adds env var and teammateMode to settings"""
+        monkeypatch.chdir(tmp_path)
+
+        parser = create_parser()
+        args = parser.parse_args(['claude', '--on', 'team'])
+        result = cmd_claude(args)
+
+        assert result == 0
+
+        settings_file = tmp_path / ".claude" / "settings.local.json"
+        assert settings_file.exists()
+
+        config = json.loads(settings_file.read_text())
+        assert "env" in config
+        assert config["env"]["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"] == "1"
+        assert config["teammateMode"] == "auto"
+
+    def test_on_team_merges_with_existing(self, tmp_path, monkeypatch):
+        """Test --on team preserves existing config and env vars"""
+        monkeypatch.chdir(tmp_path)
+
+        claude_dir = tmp_path / ".claude"
+        claude_dir.mkdir()
+        existing = {
+            "mcpServers": {
+                "chrome-devtools": {
+                    "command": "npx",
+                    "args": ["chrome-devtools-mcp@latest"]
+                }
+            },
+            "env": {
+                "OTHER_VAR": "value"
+            }
+        }
+        (claude_dir / "settings.local.json").write_text(json.dumps(existing))
+
+        parser = create_parser()
+        args = parser.parse_args(['claude', '--on', 'team'])
+        result = cmd_claude(args)
+
+        assert result == 0
+
+        config = json.loads((claude_dir / "settings.local.json").read_text())
+        assert "mcpServers" in config
+        assert "chrome-devtools" in config["mcpServers"]
+        assert config["env"]["OTHER_VAR"] == "value"
+        assert config["env"]["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"] == "1"
+        assert config["teammateMode"] == "auto"
+
+    def test_on_team_dry_run(self, tmp_path, monkeypatch):
+        """Test --on team --dry-run does not write file"""
+        monkeypatch.chdir(tmp_path)
+
+        parser = create_parser()
+        args = parser.parse_args(['claude', '--on', 'team', '--dry-run'])
+        result = cmd_claude(args)
+
+        assert result == 0
+        settings_file = tmp_path / ".claude" / "settings.local.json"
+        assert not settings_file.exists()
+
+    def test_on_team_with_allow_all(self, tmp_path, monkeypatch):
+        """Test --on team --allow all configures both"""
+        monkeypatch.chdir(tmp_path)
+
+        parser = create_parser()
+        args = parser.parse_args(['claude', '--on', 'team', '--allow', 'all'])
+        result = cmd_claude(args)
+
+        assert result == 0
+
+        settings_file = tmp_path / ".claude" / "settings.local.json"
+        config = json.loads(settings_file.read_text())
+        assert config["permissions"]["allow"] == ALLOW_ALL_PERMISSIONS
+        assert config["env"]["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"] == "1"
+        assert config["teammateMode"] == "auto"
+
+    def test_on_team_handles_corrupt_json(self, tmp_path, monkeypatch):
+        """Test --on team handles corrupt settings.local.json"""
+        monkeypatch.chdir(tmp_path)
+
+        claude_dir = tmp_path / ".claude"
+        claude_dir.mkdir()
+        (claude_dir / "settings.local.json").write_text("not valid json{{{")
+
+        parser = create_parser()
+        args = parser.parse_args(['claude', '--on', 'team'])
+        result = cmd_claude(args)
+
+        assert result == 0
+
+        config = json.loads((claude_dir / "settings.local.json").read_text())
+        assert config["env"]["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"] == "1"
+        assert config["teammateMode"] == "auto"
+
+
+class TestClaudeOffTeam:
+    """Tests for --off team feature toggle"""
+
+    def test_parse_off_team(self):
+        """Test parsing --off team"""
+        parser = create_parser()
+        args = parser.parse_args(['claude', '--off', 'team'])
+        assert args.command == 'claude'
+        assert args.off == 'team'
+
+    def test_off_team_removes_env_var(self, tmp_path, monkeypatch):
+        """Test --off team removes env var, teammateMode, and empty env object"""
+        monkeypatch.chdir(tmp_path)
+
+        claude_dir = tmp_path / ".claude"
+        claude_dir.mkdir()
+        existing = {
+            "env": {
+                "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+            },
+            "teammateMode": "auto"
+        }
+        (claude_dir / "settings.local.json").write_text(json.dumps(existing))
+
+        parser = create_parser()
+        args = parser.parse_args(['claude', '--off', 'team'])
+        result = cmd_claude(args)
+
+        assert result == 0
+
+        config = json.loads((claude_dir / "settings.local.json").read_text())
+        assert "env" not in config
+        assert "teammateMode" not in config
+
+    def test_off_team_preserves_other_env_vars(self, tmp_path, monkeypatch):
+        """Test --off team preserves other env vars, removes teammateMode"""
+        monkeypatch.chdir(tmp_path)
+
+        claude_dir = tmp_path / ".claude"
+        claude_dir.mkdir()
+        existing = {
+            "env": {
+                "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+                "OTHER_VAR": "value"
+            },
+            "teammateMode": "auto"
+        }
+        (claude_dir / "settings.local.json").write_text(json.dumps(existing))
+
+        parser = create_parser()
+        args = parser.parse_args(['claude', '--off', 'team'])
+        result = cmd_claude(args)
+
+        assert result == 0
+
+        config = json.loads((claude_dir / "settings.local.json").read_text())
+        assert "env" in config
+        assert "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS" not in config["env"]
+        assert config["env"]["OTHER_VAR"] == "value"
+        assert "teammateMode" not in config
+
+    def test_off_team_when_not_set(self, tmp_path, monkeypatch):
+        """Test --off team when env var not set (no-op, still succeeds)"""
+        monkeypatch.chdir(tmp_path)
+
+        claude_dir = tmp_path / ".claude"
+        claude_dir.mkdir()
+        existing = {"mcpServers": {}}
+        (claude_dir / "settings.local.json").write_text(json.dumps(existing))
+
+        parser = create_parser()
+        args = parser.parse_args(['claude', '--off', 'team'])
+        result = cmd_claude(args)
+
+        assert result == 0
+
+        config = json.loads((claude_dir / "settings.local.json").read_text())
+        assert "env" not in config
+        assert "teammateMode" not in config
+        assert "mcpServers" in config
+
+    def test_off_team_dry_run(self, tmp_path, monkeypatch):
+        """Test --off team --dry-run does not modify file"""
+        monkeypatch.chdir(tmp_path)
+
+        claude_dir = tmp_path / ".claude"
+        claude_dir.mkdir()
+        existing = {
+            "env": {
+                "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+            },
+            "teammateMode": "auto"
+        }
+        (claude_dir / "settings.local.json").write_text(json.dumps(existing))
+
+        parser = create_parser()
+        args = parser.parse_args(['claude', '--off', 'team', '--dry-run'])
+        result = cmd_claude(args)
+
+        assert result == 0
+
+        config = json.loads((claude_dir / "settings.local.json").read_text())
+        assert config["env"]["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"] == "1"
+        assert config["teammateMode"] == "auto"
+
+    def test_on_then_off_roundtrip(self, tmp_path, monkeypatch):
+        """Test --on team followed by --off team works correctly"""
+        monkeypatch.chdir(tmp_path)
+
+        parser = create_parser()
+
+        # Enable
+        args = parser.parse_args(['claude', '--on', 'team'])
+        result = cmd_claude(args)
+        assert result == 0
+
+        settings_file = tmp_path / ".claude" / "settings.local.json"
+        config = json.loads(settings_file.read_text())
+        assert config["env"]["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"] == "1"
+        assert config["teammateMode"] == "auto"
+
+        # Disable
+        args = parser.parse_args(['claude', '--off', 'team'])
+        result = cmd_claude(args)
+        assert result == 0
+
+        config = json.loads(settings_file.read_text())
+        assert "env" not in config
+        assert "teammateMode" not in config

@@ -185,6 +185,21 @@ class TestCompletionScriptContent:
         assert "plugin" in FISH_COMPLETION_SCRIPT
         assert "omc" in FISH_COMPLETION_SCRIPT
 
+    def test_bash_script_claude_has_on_off_team(self):
+        """Test bash script includes --on and --off team for claude subcommand"""
+        assert "--on" in BASH_COMPLETION_SCRIPT
+        assert "team" in BASH_COMPLETION_SCRIPT
+
+    def test_zsh_script_claude_has_on_off_team(self):
+        """Test zsh script includes --on and --off team for claude subcommand"""
+        assert "--on" in ZSH_COMPLETION_SCRIPT
+        assert "team" in ZSH_COMPLETION_SCRIPT
+
+    def test_fish_script_claude_has_on_off_team(self):
+        """Test fish script includes --on and team for claude subcommand"""
+        assert "-l on" in FISH_COMPLETION_SCRIPT
+        assert "team" in FISH_COMPLETION_SCRIPT
+
     def test_opencode_plugin_completion(self):
         assert "--plugin" in BASH_COMPLETION_SCRIPT
         assert "--plugin" in ZSH_COMPLETION_SCRIPT
