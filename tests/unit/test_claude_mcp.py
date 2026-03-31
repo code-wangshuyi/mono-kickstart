@@ -130,60 +130,29 @@ class TestClaudeMcpChrome:
     """Tests for MCP chrome-devtools configuration"""
 
     def test_mcp_chrome_creates_config(self, tmp_path, monkeypatch):
-        """Test --mcp chrome creates .claude/settings.local.json"""
+        """Test --mcp chrome creates .mcp.json"""
         monkeypatch.chdir(tmp_path)
 
-        with patch('mono_kickstart.cli.shutil.which', return_value=None):
-            parser = create_parser()
-            args = parser.parse_args(['claude', '--mcp', 'chrome'])
-            result = cmd_claude(args)
+        parser = create_parser()
+        args = parser.parse_args(['claude', '--mcp', 'chrome'])
+        result = cmd_claude(args)
 
         assert result == 0
 
-        settings_file = tmp_path / ".claude" / "settings.local.json"
-        assert settings_file.exists()
+        mcp_file = tmp_path / ".mcp.json"
+        assert mcp_file.exists()
 
-        config = json.loads(settings_file.read_text())
+        config = json.loads(mcp_file.read_text())
         assert "mcpServers" in config
         assert "chrome-devtools" in config["mcpServers"]
         assert config["mcpServers"]["chrome-devtools"]["command"] == "npx"
         assert config["mcpServers"]["chrome-devtools"]["args"] == ["chrome-devtools-mcp@latest"]
 
     def test_mcp_chrome_merges_with_existing_config(self, tmp_path, monkeypatch):
-        """Test --mcp chrome merges with existing settings.local.json"""
+        """Test --mcp chrome merges with existing .mcp.json"""
         monkeypatch.chdir(tmp_path)
 
-        # Create existing config
-        claude_dir = tmp_path / ".claude"
-        claude_dir.mkdir()
-        existing = {
-            "permissions": {
-                "allow": ["Bash(python -m pytest:*)"]
-            }
-        }
-        (claude_dir / "settings.local.json").write_text(json.dumps(existing))
-
-        with patch('mono_kickstart.cli.shutil.which', return_value=None):
-            parser = create_parser()
-            args = parser.parse_args(['claude', '--mcp', 'chrome'])
-            result = cmd_claude(args)
-
-        assert result == 0
-
-        config = json.loads((claude_dir / "settings.local.json").read_text())
-        # Existing config preserved
-        assert "permissions" in config
-        assert "allow" in config["permissions"]
-        # MCP config added
-        assert "mcpServers" in config
-        assert "chrome-devtools" in config["mcpServers"]
-
-    def test_mcp_chrome_merges_with_existing_mcp(self, tmp_path, monkeypatch):
-        """Test --mcp chrome merges with existing mcpServers"""
-        monkeypatch.chdir(tmp_path)
-
-        claude_dir = tmp_path / ".claude"
-        claude_dir.mkdir()
+        # Create existing .mcp.json with another server
         existing = {
             "mcpServers": {
                 "other-server": {
@@ -192,16 +161,41 @@ class TestClaudeMcpChrome:
                 }
             }
         }
-        (claude_dir / "settings.local.json").write_text(json.dumps(existing))
+        (tmp_path / ".mcp.json").write_text(json.dumps(existing))
 
-        with patch('mono_kickstart.cli.shutil.which', return_value=None):
-            parser = create_parser()
-            args = parser.parse_args(['claude', '--mcp', 'chrome'])
-            result = cmd_claude(args)
+        parser = create_parser()
+        args = parser.parse_args(['claude', '--mcp', 'chrome'])
+        result = cmd_claude(args)
 
         assert result == 0
 
-        config = json.loads((claude_dir / "settings.local.json").read_text())
+        config = json.loads((tmp_path / ".mcp.json").read_text())
+        # Existing config preserved
+        assert "other-server" in config["mcpServers"]
+        # MCP config added
+        assert "chrome-devtools" in config["mcpServers"]
+
+    def test_mcp_chrome_merges_with_existing_mcp(self, tmp_path, monkeypatch):
+        """Test --mcp chrome merges with existing mcpServers"""
+        monkeypatch.chdir(tmp_path)
+
+        existing = {
+            "mcpServers": {
+                "other-server": {
+                    "command": "node",
+                    "args": ["other-mcp"]
+                }
+            }
+        }
+        (tmp_path / ".mcp.json").write_text(json.dumps(existing))
+
+        parser = create_parser()
+        args = parser.parse_args(['claude', '--mcp', 'chrome'])
+        result = cmd_claude(args)
+
+        assert result == 0
+
+        config = json.loads((tmp_path / ".mcp.json").read_text())
         assert "other-server" in config["mcpServers"]
         assert "chrome-devtools" in config["mcpServers"]
 
@@ -209,8 +203,6 @@ class TestClaudeMcpChrome:
         """Test --mcp chrome overwrites existing chrome-devtools config"""
         monkeypatch.chdir(tmp_path)
 
-        claude_dir = tmp_path / ".claude"
-        claude_dir.mkdir()
         existing = {
             "mcpServers": {
                 "chrome-devtools": {
@@ -219,37 +211,33 @@ class TestClaudeMcpChrome:
                 }
             }
         }
-        (claude_dir / "settings.local.json").write_text(json.dumps(existing))
+        (tmp_path / ".mcp.json").write_text(json.dumps(existing))
 
-        with patch('mono_kickstart.cli.shutil.which', return_value=None):
-            parser = create_parser()
-            args = parser.parse_args(['claude', '--mcp', 'chrome'])
-            result = cmd_claude(args)
+        parser = create_parser()
+        args = parser.parse_args(['claude', '--mcp', 'chrome'])
+        result = cmd_claude(args)
 
         assert result == 0
 
-        config = json.loads((claude_dir / "settings.local.json").read_text())
+        config = json.loads((tmp_path / ".mcp.json").read_text())
         # Config should be overwritten with latest
         assert config["mcpServers"]["chrome-devtools"]["command"] == "npx"
         assert config["mcpServers"]["chrome-devtools"]["args"] == ["chrome-devtools-mcp@latest"]
 
     def test_mcp_chrome_handles_corrupt_json(self, tmp_path, monkeypatch):
-        """Test --mcp chrome handles corrupt settings.local.json"""
+        """Test --mcp chrome handles corrupt .mcp.json"""
         monkeypatch.chdir(tmp_path)
 
-        claude_dir = tmp_path / ".claude"
-        claude_dir.mkdir()
-        (claude_dir / "settings.local.json").write_text("not valid json{{{")
+        (tmp_path / ".mcp.json").write_text("not valid json{{{")
 
-        with patch('mono_kickstart.cli.shutil.which', return_value=None):
-            parser = create_parser()
-            args = parser.parse_args(['claude', '--mcp', 'chrome'])
-            result = cmd_claude(args)
+        parser = create_parser()
+        args = parser.parse_args(['claude', '--mcp', 'chrome'])
+        result = cmd_claude(args)
 
         assert result == 0
 
         # Should create fresh config
-        config = json.loads((claude_dir / "settings.local.json").read_text())
+        config = json.loads((tmp_path / ".mcp.json").read_text())
         assert "mcpServers" in config
         assert "chrome-devtools" in config["mcpServers"]
 
@@ -266,47 +254,8 @@ class TestClaudeMcpDryRun:
         result = cmd_claude(args)
 
         assert result == 0
-        settings_file = tmp_path / ".claude" / "settings.local.json"
-        assert not settings_file.exists()
-
-
-class TestClaudeMcpWithClaude:
-    """Tests for claude CLI integration"""
-
-    def test_runs_claude_mcp_add_when_available(self, tmp_path, monkeypatch):
-        """Test runs claude mcp add when claude CLI is available"""
-        monkeypatch.chdir(tmp_path)
-
-        with patch('mono_kickstart.cli.shutil.which', return_value="/usr/local/bin/claude"):
-            with patch('subprocess.run') as mock_run:
-                mock_run.return_value = MagicMock(returncode=0)
-
-                parser = create_parser()
-                args = parser.parse_args(['claude', '--mcp', 'chrome'])
-                result = cmd_claude(args)
-
-        assert result == 0
-
-        # Verify claude mcp add was called
-        calls = [str(c) for c in mock_run.call_args_list]
-        assert any("claude mcp add" in c for c in calls)
-
-    def test_succeeds_even_if_claude_mcp_add_fails(self, tmp_path, monkeypatch):
-        """Test succeeds even if claude mcp add command fails"""
-        monkeypatch.chdir(tmp_path)
-
-        with patch('mono_kickstart.cli.shutil.which', return_value="/usr/local/bin/claude"):
-            with patch('subprocess.run') as mock_run:
-                mock_run.return_value = MagicMock(returncode=1)
-
-                parser = create_parser()
-                args = parser.parse_args(['claude', '--mcp', 'chrome'])
-                result = cmd_claude(args)
-
-        # Should still succeed (config file was written)
-        assert result == 0
-        settings_file = tmp_path / ".claude" / "settings.local.json"
-        assert settings_file.exists()
+        mcp_file = tmp_path / ".mcp.json"
+        assert not mcp_file.exists()
 
 
 class TestClaudeMcpKeyboardInterrupt:
@@ -316,11 +265,10 @@ class TestClaudeMcpKeyboardInterrupt:
         """Test keyboard interrupt returns exit code 130"""
         monkeypatch.chdir(tmp_path)
 
-        with patch('mono_kickstart.cli.Path.mkdir', side_effect=KeyboardInterrupt()):
-            with patch('mono_kickstart.cli.shutil.which', return_value=None):
-                parser = create_parser()
-                args = parser.parse_args(['claude', '--mcp', 'chrome'])
-                result = cmd_claude(args)
+        with patch('mono_kickstart.cli.Path.write_text', side_effect=KeyboardInterrupt()):
+            parser = create_parser()
+            args = parser.parse_args(['claude', '--mcp', 'chrome'])
+            result = cmd_claude(args)
 
         assert result == 130
 
@@ -338,7 +286,6 @@ class TestMcpServerConfigs:
         assert "name" in config
         assert "display_name" in config
         assert "config" in config
-        assert "claude_mcp_add_cmd" in config
         assert config["name"] == "chrome-devtools"
         assert "command" in config["config"]
         assert "args" in config["config"]
@@ -353,7 +300,6 @@ class TestMcpServerConfigs:
         assert "name" in config
         assert "display_name" in config
         assert "config" in config
-        assert "claude_mcp_add_cmd" in config
         assert config["name"] == "context7"
         assert config["config"]["command"] == "npx"
         assert config["config"]["args"] == ["-y", "@upstash/context7-mcp@latest"]
@@ -363,20 +309,19 @@ class TestClaudeMcpContext7:
     """Tests for MCP context7 configuration"""
 
     def test_mcp_context7_creates_config(self, tmp_path, monkeypatch):
-        """Test --mcp context7 creates .claude/settings.local.json"""
+        """Test --mcp context7 creates .mcp.json"""
         monkeypatch.chdir(tmp_path)
 
-        with patch('mono_kickstart.cli.shutil.which', return_value=None):
-            parser = create_parser()
-            args = parser.parse_args(['claude', '--mcp', 'context7'])
-            result = cmd_claude(args)
+        parser = create_parser()
+        args = parser.parse_args(['claude', '--mcp', 'context7'])
+        result = cmd_claude(args)
 
         assert result == 0
 
-        settings_file = tmp_path / ".claude" / "settings.local.json"
-        assert settings_file.exists()
+        mcp_file = tmp_path / ".mcp.json"
+        assert mcp_file.exists()
 
-        config = json.loads(settings_file.read_text())
+        config = json.loads(mcp_file.read_text())
         assert "mcpServers" in config
         assert "context7" in config["mcpServers"]
         assert config["mcpServers"]["context7"]["command"] == "npx"
@@ -469,20 +414,24 @@ class TestClaudeAllowAll:
         assert not settings_file.exists()
 
     def test_allow_all_with_mcp(self, tmp_path, monkeypatch):
-        """Test --allow all --mcp chrome configures both"""
+        """Test --allow all --mcp chrome configures both files"""
         monkeypatch.chdir(tmp_path)
 
-        with patch('mono_kickstart.cli.shutil.which', return_value=None):
-            parser = create_parser()
-            args = parser.parse_args(['claude', '--allow', 'all', '--mcp', 'chrome'])
-            result = cmd_claude(args)
+        parser = create_parser()
+        args = parser.parse_args(['claude', '--allow', 'all', '--mcp', 'chrome'])
+        result = cmd_claude(args)
 
         assert result == 0
 
+        # Permissions in settings.local.json
         settings_file = tmp_path / ".claude" / "settings.local.json"
-        config = json.loads(settings_file.read_text())
-        assert config["permissions"]["allow"] == ALLOW_ALL_PERMISSIONS
-        assert "chrome-devtools" in config["mcpServers"]
+        settings_config = json.loads(settings_file.read_text())
+        assert settings_config["permissions"]["allow"] == ALLOW_ALL_PERMISSIONS
+
+        # MCP in .mcp.json
+        mcp_file = tmp_path / ".mcp.json"
+        mcp_config = json.loads(mcp_file.read_text())
+        assert "chrome-devtools" in mcp_config["mcpServers"]
 
     def test_allow_all_handles_corrupt_json(self, tmp_path, monkeypatch):
         """Test --allow all handles corrupt settings.local.json"""

@@ -214,3 +214,15 @@ class TestCompletionScriptContent:
         assert "mono-kickstart" in ZSH_COMPLETION_SCRIPT
         assert "mk" in FISH_COMPLETION_SCRIPT
         assert "mono-kickstart" in FISH_COMPLETION_SCRIPT
+
+    def test_bash_script_claude_has_show(self):
+        """Test bash script includes show for claude subcommand"""
+        assert "show" in BASH_COMPLETION_SCRIPT
+
+    def test_zsh_script_claude_has_show(self):
+        """Test zsh script includes show for claude subcommand"""
+        assert "show" in ZSH_COMPLETION_SCRIPT
+
+    def test_fish_script_claude_has_show(self):
+        """Test fish script includes show for claude subcommand"""
+        assert "show" in FISH_COMPLETION_SCRIPT

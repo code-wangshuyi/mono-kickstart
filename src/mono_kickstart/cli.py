@@ -70,10 +70,11 @@ ALLOW_ALL_PERMISSIONS = [
     "AskUserQuestion",
     "ListDir",
     "MultiEdit",
+    "mcp__*",
 ]
 
 # --mode 可选值
-MODE_CHOICES = ["plan"]
+MODE_CHOICES = ["plan", "default"]
 
 # --on 可选值
 ON_CHOICES = ["team"]
@@ -104,13 +105,11 @@ MCP_SERVER_CONFIGS = {
         "name": "chrome-devtools",
         "display_name": "Chrome DevTools",
         "config": {"command": "npx", "args": ["chrome-devtools-mcp@latest"]},
-        "claude_mcp_add_cmd": "claude mcp add chrome-devtools --scope user npx chrome-devtools-mcp@latest",
     },
     "context7": {
         "name": "context7",
         "display_name": "Context7",
         "config": {"command": "npx", "args": ["-y", "@upstash/context7-mcp@latest"]},
-        "claude_mcp_add_cmd": "claude mcp add context7 -- npx -y @upstash/context7-mcp@latest",
     },
 }
 
@@ -391,6 +390,7 @@ def create_parser() -> argparse.ArgumentParser:
         "将配置写入当前目录的 .claude/ 目录。",
         formatter_class=ChineseHelpFormatter,
         epilog="示例:\n"
+        "  mk claude show                       展示 Claude Code 配置信息\n"
         "  mk claude --mcp chrome               添加 Chrome DevTools MCP 服务器\n"
         "  mk claude --allow all                允许所有命令\n"
         "  mk claude --mode plan                默认以 plan 模式运行\n"
@@ -398,8 +398,8 @@ def create_parser() -> argparse.ArgumentParser:
         "  mk claude --allow all --mcp chrome   同时配置权限和 MCP\n"
         "  mk claude --on team                  启用实验性团队功能\n"
         "  mk claude --off team                 禁用实验性团队功能\n"
-        "  mk claude --off suggestion             关闭提示建议功能\n"
-        "  mk claude --skills uipro              安装 UIPro 设计技能包\n"
+        "  mk claude --off suggestion           关闭提示建议功能\n"
+        "  mk claude --skills uipro             安装 UIPro 设计技能包\n"
         "  mk claude --plugin omc               安装并配置 Oh My Claude Code\n"
         "  mk claude --allow all --dry-run      模拟运行，查看将写入的配置",
     )
@@ -453,6 +453,17 @@ def create_parser() -> argparse.ArgumentParser:
         help=f"安装 Claude Code 插件 (可选值: {', '.join(PLUGIN_CHOICES)})",
     )
     claude_parser.add_argument("--dry-run", action="store_true", help="模拟运行，不实际写入配置")
+
+    # claude 子命令的子解析器
+    claude_subparsers = claude_parser.add_subparsers(dest="claude_action", help="子操作")
+    claude_show_parser = claude_subparsers.add_parser(
+        "show",
+        help="展示当前项目的 Claude Code 配置信息",
+        description="展示当前项目的 Claude Code 配置信息\n\n"
+        "检查并显示 Claude Code 安装状态、CLAUDE.md 文件、设置文件和 MCP 配置。",
+        formatter_class=ChineseHelpFormatter,
+        epilog="示例:\n" "  mk claude show                查看当前项目的 Claude Code 配置",
+    )
 
     opencode_parser = subparsers.add_parser(
         "opencode",
@@ -1773,6 +1784,10 @@ def cmd_claude(args: argparse.Namespace) -> int:
     Returns:
         退出码（0 表示成功）
     """
+    # 检查是否是子命令（如 show）
+    if getattr(args, "claude_action", None) == "show":
+        return cmd_claude_show(args)
+
     # 验证: 至少需要一个操作
     if (
         not args.mcp
@@ -1847,7 +1862,7 @@ def cmd_claude(args: argparse.Namespace) -> int:
 def _claude_add_mcp(server_key: str, dry_run: bool) -> int:
     """添加 MCP 服务器配置到当前项目
 
-    将 MCP 服务器配置写入 .claude/settings.local.json。
+    将 MCP 服务器配置写入项目根目录的 .mcp.json。
 
     Args:
         server_key: MCP 服务器标识（如 chrome）
@@ -1864,14 +1879,13 @@ def _claude_add_mcp(server_key: str, dry_run: bool) -> int:
     logger.info(f"📋 [MCP] 添加 {display_name} 服务器...")
 
     # 目标文件
-    claude_dir = Path(".claude")
-    settings_file = claude_dir / "settings.local.json"
+    mcp_file = Path(".mcp.json")
 
     # 读取现有配置
     existing_config = {}
-    if settings_file.exists():
+    if mcp_file.exists():
         try:
-            existing_config = json.loads(settings_file.read_text(encoding="utf-8"))
+            existing_config = json.loads(mcp_file.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError) as e:
             logger.warning(f"⚠️  读取现有配置失败，将创建新配置: {e}")
 
@@ -1881,7 +1895,7 @@ def _claude_add_mcp(server_key: str, dry_run: bool) -> int:
     existing_config["mcpServers"][server_name] = mcp_config
 
     if dry_run:
-        logger.info(f"  [模拟运行] 将写入 {settings_file}:")
+        logger.info(f"  [模拟运行] 将写入 {mcp_file}:")
         logger.info(f"  {json.dumps({'mcpServers': {server_name: mcp_config}}, indent=2)}")
         logger.info("")
         logger.info("============================================================")
@@ -1890,34 +1904,12 @@ def _claude_add_mcp(server_key: str, dry_run: bool) -> int:
         logger.info("✨ 模拟运行完成，未实际写入任何配置。")
         return 0
 
-    # 创建 .claude 目录
-    claude_dir.mkdir(parents=True, exist_ok=True)
-
     # 写入配置
-    settings_file.write_text(
+    mcp_file.write_text(
         json.dumps(existing_config, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
 
-    logger.info(f"✓ {display_name} MCP 服务器配置已写入 {settings_file}")
-
-    # 尝试运行 claude mcp add 命令
-    claude_mcp_cmd = server_info["claude_mcp_add_cmd"]
-    if shutil.which("claude"):
-        logger.info("")
-        logger.info(f"📋 [MCP] 执行 claude mcp add 注册命令...")
-        result = subprocess.run(
-            claude_mcp_cmd,
-            shell=True,
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        if result.returncode == 0:
-            logger.info(f"✓ 已通过 claude CLI 注册 {display_name} MCP 服务器")
-        else:
-            logger.warning(f"⚠️  claude mcp add 执行失败（配置文件已写入，可忽略）")
-    else:
-        logger.info(f"💡 提示: 也可手动执行 '{claude_mcp_cmd}' 注册 MCP 服务器")
+    logger.info(f"✓ {display_name} MCP 服务器配置已写入 {mcp_file}")
 
     logger.info("")
     logger.info("============================================================")
@@ -2374,6 +2366,110 @@ def _claude_add_plugin(plugin_key: str, dry_run: bool) -> int:
     logger.info("✓ OMC: 插件安装与项目配置完成")
     logger.info("============================================================")
     logger.info("✨ Claude Code 插件配置完成！")
+    return 0
+
+
+def cmd_claude_show(args: argparse.Namespace) -> int:
+    """展示当前项目的 Claude Code 配置信息
+
+    Args:
+        args: 解析后的命令行参数
+
+    Returns:
+        退出码（0 表示成功）
+    """
+    from mono_kickstart.tool_detector import ToolDetector
+
+    logger.info("📋 Claude Code 配置信息")
+    logger.info("=" * 50)
+    logger.info("")
+
+    # 1. Claude Code 安装状态
+    detector = ToolDetector()
+    claude_status = detector.detect_claude_code()
+    if claude_status.installed:
+        logger.info("✓ Claude Code 已安装")
+        logger.info(f"  版本: {claude_status.version}")
+        logger.info(f"  路径: {claude_status.path}")
+    else:
+        logger.warning("✗ Claude Code 未安装")
+        logger.info("  💡 提示: 可以通过 mk install claude 安装 Claude Code")
+
+    logger.info("")
+
+    # 2. CLAUDE.md 文件
+    logger.info("📄 CLAUDE.md 文件:")
+    claude_md_paths = [
+        ("项目根目录", "CLAUDE.md"),
+        ("项目 .claude 目录", ".claude/CLAUDE.md"),
+    ]
+    found_claude_md = False
+    for label, path in claude_md_paths:
+        if os.path.exists(path):
+            size = os.path.getsize(path)
+            logger.info(f"  ✓ {label}: {path} ({size} bytes)")
+            found_claude_md = True
+        else:
+            logger.info(f"  ✗ {label}: {path} (未找到)")
+
+    if not found_claude_md:
+        logger.info("  💡 提示: 可以在项目根目录创建 CLAUDE.md 来为 Claude Code 提供项目上下文")
+
+    logger.info("")
+
+    # 3. Settings 文件
+    logger.info("⚙️  设置文件:")
+    settings_paths = [
+        ("项目级设置", ".claude/settings.json"),
+        ("项目级本地设置", ".claude/settings.local.json"),
+        ("用户级设置", os.path.expanduser("~/.claude/settings.json")),
+    ]
+    found_settings = False
+    for label, path in settings_paths:
+        if os.path.exists(path):
+            logger.info(f"  ✓ {label}: {path}")
+            found_settings = True
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    content = json.load(f)
+                formatted = json.dumps(content, indent=4, ensure_ascii=False)
+                for line in formatted.split("\n"):
+                    logger.info(f"    {line}")
+            except (json.JSONDecodeError, OSError) as e:
+                logger.warning(f"    ⚠️  无法读取文件内容: {e}")
+        else:
+            logger.info(f"  ✗ {label}: {path} (未找到)")
+
+    if not found_settings:
+        logger.info("  💡 提示: 可以通过 mk claude --allow all 等命令生成配置文件")
+
+    logger.info("")
+
+    # 4. MCP 配置
+    logger.info("🔌 MCP 配置:")
+    mcp_paths = [
+        ("项目级 MCP", ".mcp.json"),
+        ("用户级 MCP", os.path.expanduser("~/.claude/mcp.json")),
+    ]
+    found_mcp = False
+    for label, path in mcp_paths:
+        if os.path.exists(path):
+            logger.info(f"  ✓ {label}: {path}")
+            found_mcp = True
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    content = json.load(f)
+                formatted = json.dumps(content, indent=4, ensure_ascii=False)
+                for line in formatted.split("\n"):
+                    logger.info(f"    {line}")
+            except (json.JSONDecodeError, OSError) as e:
+                logger.warning(f"    ⚠️  无法读取文件内容: {e}")
+        else:
+            logger.info(f"  ✗ {label}: {path} (未找到)")
+
+    if not found_mcp:
+        logger.info("  💡 提示: 可以通过 mk claude --mcp chrome 添加 MCP 配置")
+
     return 0
 
 

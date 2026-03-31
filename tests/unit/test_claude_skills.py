@@ -281,10 +281,10 @@ class TestClaudeSkillsCombinations:
 
         assert result == 0
 
-        # MCP config should be written
-        settings_file = tmp_path / ".claude" / "settings.local.json"
-        assert settings_file.exists()
-        config = json.loads(settings_file.read_text())
+        # MCP config should be written to .mcp.json
+        mcp_file = tmp_path / ".mcp.json"
+        assert mcp_file.exists()
+        config = json.loads(mcp_file.read_text())
         assert "chrome-devtools" in config["mcpServers"]
 
     def test_skills_with_allow_all(self, tmp_path, monkeypatch):
