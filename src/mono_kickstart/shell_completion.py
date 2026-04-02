@@ -81,7 +81,7 @@ _mk_completion() {
             elif [[ ${prev} == "--allow" ]]; then
                 COMPREPLY=( $(compgen -W "all" -- ${cur}) )
             elif [[ ${prev} == "--mode" ]]; then
-                COMPREPLY=( $(compgen -W "plan default" -- ${cur}) )
+                COMPREPLY=( $(compgen -W "plan default auto acceptEdits dontAsk bypassPermissions" -- ${cur}) )
             elif [[ ${prev} == "--on" ]]; then
                 COMPREPLY=( $(compgen -W "team" -- ${cur}) )
             elif [[ ${prev} == "--off" ]]; then
@@ -235,7 +235,7 @@ _mk() {
                         '1: :->claude_action' \
                         '--mcp[添加 MCP 服务器配置]:server:(chrome context7)' \
                         '--allow[配置权限允许所有命令]:scope:(all)' \
-                        '--mode[设置权限模式]:mode:(plan default)' \
+                        '--mode[设置权限模式]:mode:(plan default auto acceptEdits dontAsk bypassPermissions)' \
                         '--on[启用指定功能]:feature:(team)' \
                         '--off[禁用指定功能]:feature:(suggestion team)' \
                         '--skills[安装 Claude Code 技能包]:skill:(uipro)' \
@@ -380,7 +380,7 @@ complete -c mk -f -n "__fish_seen_subcommand_from claude; and not __fish_seen_su
 # claude 命令选项
 complete -c mk -f -n "__fish_seen_subcommand_from claude" -l mcp -d "添加 MCP 服务器配置" -a "chrome context7"
 complete -c mk -f -n "__fish_seen_subcommand_from claude" -l allow -d "配置权限允许所有命令" -a "all"
-complete -c mk -f -n "__fish_seen_subcommand_from claude" -l mode -d "设置权限模式" -a "plan default"
+complete -c mk -f -n "__fish_seen_subcommand_from claude" -l mode -d "设置权限模式" -a "plan default auto acceptEdits dontAsk bypassPermissions"
 complete -c mk -f -n "__fish_seen_subcommand_from claude" -l on -d "启用指定功能" -a "team"
 complete -c mk -f -n "__fish_seen_subcommand_from claude" -l off -d "禁用指定功能" -a "suggestion team"
 complete -c mk -f -n "__fish_seen_subcommand_from claude" -l skills -d "安装 Claude Code 技能包" -a "uipro"

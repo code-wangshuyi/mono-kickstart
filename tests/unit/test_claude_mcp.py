@@ -347,7 +347,8 @@ class TestClaudeAllowAll:
         config = json.loads(settings_file.read_text())
         assert "permissions" in config
         assert "allow" in config["permissions"]
-        assert config["permissions"]["allow"] == ALLOW_ALL_PERMISSIONS
+        # 无 .mcp.json 时回退到 mcp__* 通配符
+        assert config["permissions"]["allow"] == ALLOW_ALL_PERMISSIONS + ["mcp__*"]
 
     def test_allow_all_merges_with_existing_mcp(self, tmp_path, monkeypatch):
         """Test --allow all preserves existing mcpServers"""
@@ -374,7 +375,8 @@ class TestClaudeAllowAll:
         config = json.loads((claude_dir / "settings.local.json").read_text())
         assert "mcpServers" in config
         assert "chrome-devtools" in config["mcpServers"]
-        assert config["permissions"]["allow"] == ALLOW_ALL_PERMISSIONS
+        # 无 .mcp.json 时回退到 mcp__* 通配符
+        assert config["permissions"]["allow"] == ALLOW_ALL_PERMISSIONS + ["mcp__*"]
 
     def test_allow_all_overwrites_existing_permissions(self, tmp_path, monkeypatch):
         """Test --allow all overwrites existing permissions.allow"""
@@ -399,7 +401,8 @@ class TestClaudeAllowAll:
         assert result == 0
 
         config = json.loads((claude_dir / "settings.local.json").read_text())
-        assert config["permissions"]["allow"] == ALLOW_ALL_PERMISSIONS
+        # 无 .mcp.json 时回退到 mcp__* 通配符
+        assert config["permissions"]["allow"] == ALLOW_ALL_PERMISSIONS + ["mcp__*"]
 
     def test_allow_all_dry_run(self, tmp_path, monkeypatch):
         """Test --allow all --dry-run does not write file"""
@@ -423,15 +426,17 @@ class TestClaudeAllowAll:
 
         assert result == 0
 
-        # Permissions in settings.local.json
-        settings_file = tmp_path / ".claude" / "settings.local.json"
-        settings_config = json.loads(settings_file.read_text())
-        assert settings_config["permissions"]["allow"] == ALLOW_ALL_PERMISSIONS
-
         # MCP in .mcp.json
         mcp_file = tmp_path / ".mcp.json"
         mcp_config = json.loads(mcp_file.read_text())
         assert "chrome-devtools" in mcp_config["mcpServers"]
+
+        # Permissions in settings.local.json — 应包含具体的 MCP 服务器权限
+        settings_file = tmp_path / ".claude" / "settings.local.json"
+        settings_config = json.loads(settings_file.read_text())
+        assert settings_config["permissions"]["allow"] == (
+            ALLOW_ALL_PERMISSIONS + ["mcp__chrome-devtools__*"]
+        )
 
     def test_allow_all_handles_corrupt_json(self, tmp_path, monkeypatch):
         """Test --allow all handles corrupt settings.local.json"""
@@ -448,14 +453,76 @@ class TestClaudeAllowAll:
         assert result == 0
 
         config = json.loads((claude_dir / "settings.local.json").read_text())
-        assert config["permissions"]["allow"] == ALLOW_ALL_PERMISSIONS
+        # 无 .mcp.json 时回退到 mcp__* 通配符
+        assert config["permissions"]["allow"] == ALLOW_ALL_PERMISSIONS + ["mcp__*"]
+
+    def test_allow_all_reads_mcp_json(self, tmp_path, monkeypatch):
+        """Test --allow all reads .mcp.json and adds per-server MCP permissions"""
+        monkeypatch.chdir(tmp_path)
+
+        # 创建 .mcp.json 含多个服务器
+        mcp_config = {
+            "mcpServers": {
+                "ssh-ops": {"command": "npx", "args": ["ssh-mcp"]},
+                "host-ops": {"command": "npx", "args": ["host-mcp"]},
+            }
+        }
+        (tmp_path / ".mcp.json").write_text(json.dumps(mcp_config))
+
+        parser = create_parser()
+        args = parser.parse_args(['claude', '--allow', 'all'])
+        result = cmd_claude(args)
+
+        assert result == 0
+
+        config = json.loads(
+            (tmp_path / ".claude" / "settings.local.json").read_text()
+        )
+        allow_list = config["permissions"]["allow"]
+        assert "mcp__ssh-ops__*" in allow_list
+        assert "mcp__host-ops__*" in allow_list
+        assert "mcp__*" not in allow_list
+
+    def test_allow_all_empty_mcp_servers(self, tmp_path, monkeypatch):
+        """Test --allow all with empty mcpServers falls back to mcp__*"""
+        monkeypatch.chdir(tmp_path)
+
+        (tmp_path / ".mcp.json").write_text(json.dumps({"mcpServers": {}}))
+
+        parser = create_parser()
+        args = parser.parse_args(['claude', '--allow', 'all'])
+        result = cmd_claude(args)
+
+        assert result == 0
+
+        config = json.loads(
+            (tmp_path / ".claude" / "settings.local.json").read_text()
+        )
+        assert config["permissions"]["allow"] == ALLOW_ALL_PERMISSIONS + ["mcp__*"]
+
+    def test_allow_all_corrupt_mcp_json(self, tmp_path, monkeypatch):
+        """Test --allow all with corrupt .mcp.json falls back to mcp__*"""
+        monkeypatch.chdir(tmp_path)
+
+        (tmp_path / ".mcp.json").write_text("not valid json{{{")
+
+        parser = create_parser()
+        args = parser.parse_args(['claude', '--allow', 'all'])
+        result = cmd_claude(args)
+
+        assert result == 0
+
+        config = json.loads(
+            (tmp_path / ".claude" / "settings.local.json").read_text()
+        )
+        assert config["permissions"]["allow"] == ALLOW_ALL_PERMISSIONS + ["mcp__*"]
 
 
 class TestClaudeMode:
     """Tests for --mode plan permission configuration"""
 
     def test_mode_plan_creates_config(self, tmp_path, monkeypatch):
-        """Test --mode plan creates .claude/settings.local.json with permissionMode"""
+        """Test --mode plan creates .claude/settings.local.json with defaultMode"""
         monkeypatch.chdir(tmp_path)
 
         parser = create_parser()
@@ -468,7 +535,8 @@ class TestClaudeMode:
         assert settings_file.exists()
 
         config = json.loads(settings_file.read_text())
-        assert config["permissionMode"] == "plan"
+        assert config["permissions"]["defaultMode"] == "plan"
+        assert "permissionMode" not in config
 
     def test_mode_plan_merges_with_existing(self, tmp_path, monkeypatch):
         """Test --mode plan preserves existing config"""
@@ -499,7 +567,8 @@ class TestClaudeMode:
         assert "mcpServers" in config
         assert "chrome-devtools" in config["mcpServers"]
         assert config["permissions"]["allow"] == ["Bash(*)"]
-        assert config["permissionMode"] == "plan"
+        assert config["permissions"]["defaultMode"] == "plan"
+        assert "permissionMode" not in config
 
     def test_mode_plan_dry_run(self, tmp_path, monkeypatch):
         """Test --mode plan --dry-run does not write file"""
@@ -514,11 +583,12 @@ class TestClaudeMode:
         assert not settings_file.exists()
 
     def test_mode_plan_overwrites_existing_mode(self, tmp_path, monkeypatch):
-        """Test --mode plan overwrites existing permissionMode"""
+        """Test --mode plan overwrites existing mode and migrates old format"""
         monkeypatch.chdir(tmp_path)
 
         claude_dir = tmp_path / ".claude"
         claude_dir.mkdir()
+        # 使用旧格式 permissionMode，验证迁移后被移除
         existing = {"permissionMode": "default"}
         (claude_dir / "settings.local.json").write_text(json.dumps(existing))
 
@@ -529,7 +599,8 @@ class TestClaudeMode:
         assert result == 0
 
         config = json.loads((claude_dir / "settings.local.json").read_text())
-        assert config["permissionMode"] == "plan"
+        assert config["permissions"]["defaultMode"] == "plan"
+        assert "permissionMode" not in config
 
     def test_mode_plan_with_allow_all(self, tmp_path, monkeypatch):
         """Test --mode plan --allow all configures both"""
@@ -543,8 +614,10 @@ class TestClaudeMode:
 
         settings_file = tmp_path / ".claude" / "settings.local.json"
         config = json.loads(settings_file.read_text())
-        assert config["permissions"]["allow"] == ALLOW_ALL_PERMISSIONS
-        assert config["permissionMode"] == "plan"
+        # 无 .mcp.json 时回退到 mcp__* 通配符
+        assert config["permissions"]["allow"] == ALLOW_ALL_PERMISSIONS + ["mcp__*"]
+        assert config["permissions"]["defaultMode"] == "plan"
+        assert "permissionMode" not in config
 
 
 class TestClaudeOffSuggestion:
@@ -635,7 +708,8 @@ class TestClaudeOffSuggestion:
 
         settings_file = tmp_path / ".claude" / "settings.local.json"
         config = json.loads(settings_file.read_text())
-        assert config["permissions"]["allow"] == ALLOW_ALL_PERMISSIONS
+        # 无 .mcp.json 时回退到 mcp__* 通配符
+        assert config["permissions"]["allow"] == ALLOW_ALL_PERMISSIONS + ["mcp__*"]
         assert config["promptSuggestionEnabled"] is False
 
     def test_off_suggestion_handles_corrupt_json(self, tmp_path, monkeypatch):
@@ -747,7 +821,8 @@ class TestClaudeOnTeam:
 
         settings_file = tmp_path / ".claude" / "settings.local.json"
         config = json.loads(settings_file.read_text())
-        assert config["permissions"]["allow"] == ALLOW_ALL_PERMISSIONS
+        # 无 .mcp.json 时回退到 mcp__* 通配符
+        assert config["permissions"]["allow"] == ALLOW_ALL_PERMISSIONS + ["mcp__*"]
         assert config["env"]["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"] == "1"
         assert config["teammateMode"] == "auto"
 

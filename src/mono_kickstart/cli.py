@@ -70,11 +70,10 @@ ALLOW_ALL_PERMISSIONS = [
     "AskUserQuestion",
     "ListDir",
     "MultiEdit",
-    "mcp__*",
 ]
 
 # --mode 可选值
-MODE_CHOICES = ["plan", "default"]
+MODE_CHOICES = ["plan", "default", "auto", "acceptEdits", "dontAsk", "bypassPermissions"]
 
 # --on 可选值
 ON_CHOICES = ["team"]
@@ -1923,6 +1922,8 @@ def _claude_set_allow(dry_run: bool) -> int:
     """配置权限允许所有命令
 
     将 permissions.allow 设置为完整工具列表，写入 .claude/settings.local.json。
+    会读取当前目录的 .mcp.json，为每个 MCP 服务器生成 mcp__<server-name> 权限条目。
+    若无 .mcp.json 或无服务器，则回退到 mcp__* 通配符。
 
     Args:
         dry_run: 是否模拟运行
@@ -1931,6 +1932,28 @@ def _claude_set_allow(dry_run: bool) -> int:
         退出码（0 表示成功）
     """
     logger.info("📋 [权限] 配置允许所有命令...")
+
+    # 从 .mcp.json 读取 MCP 服务器列表，生成权限条目
+    mcp_permissions = []
+    mcp_file = Path(".mcp.json")
+    if mcp_file.exists():
+        try:
+            mcp_config = json.loads(mcp_file.read_text(encoding="utf-8"))
+            server_names = list(mcp_config.get("mcpServers", {}).keys())
+            if server_names:
+                mcp_permissions = [f"mcp__{name}__*" for name in server_names]
+                logger.info(
+                    f"  从 .mcp.json 读取到 {len(server_names)} 个 MCP 服务器: "
+                    f"{', '.join(server_names)}"
+                )
+        except (json.JSONDecodeError, OSError) as e:
+            logger.warning(f"⚠️  读取 .mcp.json 失败: {e}")
+
+    if not mcp_permissions:
+        mcp_permissions = ["mcp__*"]
+        logger.info("  未找到 .mcp.json 或无 MCP 服务器，使用通配符 mcp__*")
+
+    all_permissions = ALLOW_ALL_PERMISSIONS + mcp_permissions
 
     # 目标文件
     claude_dir = Path(".claude")
@@ -1947,11 +1970,12 @@ def _claude_set_allow(dry_run: bool) -> int:
     # 合并权限配置（覆盖 permissions.allow）
     if "permissions" not in existing_config:
         existing_config["permissions"] = {}
-    existing_config["permissions"]["allow"] = ALLOW_ALL_PERMISSIONS
+    existing_config["permissions"]["allow"] = all_permissions
 
     if dry_run:
         logger.info(f"  [模拟运行] 将写入 {settings_file}:")
-        logger.info(f"  {json.dumps({'permissions': {'allow': ALLOW_ALL_PERMISSIONS}}, indent=2)}")
+        preview = {"permissions": {"allow": all_permissions}}
+        logger.info(f"  {json.dumps(preview, indent=2)}")
         logger.info("")
         logger.info("============================================================")
         logger.info("○ [模拟运行] 权限: 将配置允许所有命令")
@@ -1964,11 +1988,12 @@ def _claude_set_allow(dry_run: bool) -> int:
 
     # 写入配置
     settings_file.write_text(
-        json.dumps(existing_config, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        json.dumps(existing_config, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
     )
 
     logger.info(f"✓ 权限配置已写入 {settings_file}")
-    logger.info(f"  permissions.allow = {json.dumps(ALLOW_ALL_PERMISSIONS)}")
+    logger.info(f"  permissions.allow = {json.dumps(all_permissions)}")
     logger.info("")
     logger.info("============================================================")
     logger.info("✓ 权限: 已配置允许所有命令")
@@ -1980,10 +2005,10 @@ def _claude_set_allow(dry_run: bool) -> int:
 def _claude_set_mode(mode: str, dry_run: bool) -> int:
     """配置权限模式
 
-    设置 permissionMode，写入 .claude/settings.local.json。
+    设置 permissions.defaultMode，写入 .claude/settings.local.json。
 
     Args:
-        mode: 权限模式（如 plan）
+        mode: 权限模式（如 plan、auto、bypassPermissions 等）
         dry_run: 是否模拟运行
 
     Returns:
@@ -2003,14 +2028,20 @@ def _claude_set_mode(mode: str, dry_run: bool) -> int:
         except (json.JSONDecodeError, OSError) as e:
             logger.warning(f"⚠️  读取现有配置失败，将创建新配置: {e}")
 
-    existing_config["permissionMode"] = mode
+    # 使用新格式: permissions.defaultMode（替代旧的顶层 permissionMode）
+    if "permissions" not in existing_config:
+        existing_config["permissions"] = {}
+    existing_config["permissions"]["defaultMode"] = mode
+    # 移除旧格式字段（如果存在）
+    existing_config.pop("permissionMode", None)
 
     if dry_run:
         logger.info(f"  [模拟运行] 将写入 {settings_file}:")
-        logger.info(f"  {json.dumps({'permissionMode': mode}, indent=2)}")
+        preview = {"permissions": {"defaultMode": mode}}
+        logger.info(f"  {json.dumps(preview, indent=2)}")
         logger.info("")
         logger.info("============================================================")
-        logger.info(f"○ [模拟运行] 模式: 将配置 permissionMode = {mode}")
+        logger.info(f"○ [模拟运行] 模式: 将配置 defaultMode = {mode}")
         logger.info("============================================================")
         logger.info("✨ 模拟运行完成，未实际写入任何配置。")
         return 0
@@ -2020,14 +2051,15 @@ def _claude_set_mode(mode: str, dry_run: bool) -> int:
 
     # 写入配置
     settings_file.write_text(
-        json.dumps(existing_config, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        json.dumps(existing_config, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
     )
 
     logger.info(f"✓ 模式配置已写入 {settings_file}")
-    logger.info(f'  permissionMode = "{mode}"')
+    logger.info(f'  defaultMode = "{mode}"')
     logger.info("")
     logger.info("============================================================")
-    logger.info(f"✓ 模式: 已配置 permissionMode = {mode}")
+    logger.info(f"✓ 模式: 已配置 defaultMode = {mode}")
     logger.info("============================================================")
     logger.info("✨ Claude Code 模式配置完成！")
     return 0
