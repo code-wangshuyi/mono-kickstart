@@ -1265,6 +1265,9 @@ venv/
    curl -LsSf https://astral.sh/uv/install.sh | sh
    ```
 
+> 💡 使用下方的一键脚本 `scripts/setenv.sh` 时，以上两步无需手工执行：
+> 脚本会自动安装 uv，并由 uv 拉取所需的 Python 3.11。
+
 ### 克隆仓库
 
 ```bash
@@ -1272,11 +1275,36 @@ git clone https://github.com/mono-kickstart/mono-kickstart.git
 cd mono-kickstart
 ```
 
-### 安装开发依赖
+### 一键配置开发环境（推荐）
+
+```bash
+bash scripts/setenv.sh
+```
+
+该脚本会依次完成：安装 uv（已有则跳过）→ 创建 Python 3.11 虚拟环境 →
+按 `uv.lock` 同步依赖（含 dev）→ 将 `mk` 软链到 `/usr/local/bin`。
+
+脚本是**幂等**的，可反复执行：已就绪的环节自动跳过；若 `.venv` 损坏
+（例如解释器被删导致软链悬空）会自动识别并重建。
+
+常用选项：
+
+```bash
+bash scripts/setenv.sh --check       # 配置完成后执行冒烟自检
+bash scripts/setenv.sh --force       # 强制删除并重建 .venv
+bash scripts/setenv.sh --with-ruff   # 额外安装 ruff（lint/format）
+bash scripts/setenv.sh --test        # 结尾运行单元测试
+bash scripts/setenv.sh --no-link     # 不创建 /usr/local/bin/mk 软链
+bash scripts/setenv.sh --help        # 查看全部选项
+```
+
+### 安装开发依赖（手工方式）
+
+若不使用上面的脚本，也可以手工安装：
 
 ```bash
 # 使用 uv（推荐）
-uv pip install -e ".[dev]"
+uv sync --extra dev
 
 # 或使用 pip
 pip install -e ".[dev]"

@@ -10,6 +10,9 @@ mono-kickstart (`mk`) is a Python 3.11+ CLI tool for initializing Monorepo proje
 
 ### Development Setup
 ```bash
+bash scripts/setenv.sh       # 一键：装 uv、建 3.11 venv、装 dev 依赖、软链 mk（幂等，可重复执行）
+bash scripts/setenv.sh --help  # 查看 --check / --force / --with-ruff / --test / --no-link 等选项
+
 uv sync --extra dev          # Install all dependencies including dev
 uv pip install -e .          # Install package in editable mode
 ```
